@@ -45,28 +45,35 @@ No context is lost between phases because every agent reads from and writes to t
 
 ## Setup
 
-### 1. Clone Swamr
+### 1. Install Swamr
 
 ```bash
-git clone https://github.com/vedthakar/swamr.git ~/swamr
+# Option A: Install globally (recommended)
+npm install -g swamr
+
+# Option B: Clone and link manually
+git clone https://github.com/Vedthakar/swamr.git ~/swamr
+cd ~/swamr && npm install && npm run build && npm link
 ```
 
 ### 2. Initialize in Your Project
 
 ```bash
-# New project
-cd ~/my-new-app
-~/swamr/init-project.sh .
+# Initialize in current directory
+swamr init
 
-# Or create a new directory
-~/swamr/init-project.sh ~/my-new-app
+# Or create a new project
+swamr init ./my-new-app
+
+# Or use npx without installing globally
+npx swamr init ./my-new-app
 ```
 
 This does everything:
 - Clones 150+ agent skills from [agency-agents](https://github.com/msitarzewski/agency-agents)
 - Converts them to Cursor `.mdc` rule files
 - Installs the orchestrator, planner, QA loop, and brain system
-- Creates the Obsidian vault structure
+- Creates the Obsidian vault structure with templates
 - Sets up git and gitignore
 
 ### 3. Open in Cursor + Obsidian
@@ -305,12 +312,17 @@ If you have MCP servers configured in Cursor, the agents use them automatically:
 ## Updating
 
 ```bash
-cd ~/swamr
-git pull                              # Update Swamr itself
-./setup.sh ~/path/to/your/project     # Re-install with latest agents
+# If installed globally
+npm update -g swamr
+
+# If cloned locally
+cd ~/swamr && git pull && npm run build
+
+# Then re-init any project to get the latest agents
+swamr init ~/path/to/your/project
 ```
 
-The agency-agents repo is re-pulled automatically during setup.
+The agency-agents repo is re-pulled automatically during init.
 
 ---
 
@@ -342,14 +354,15 @@ Reference it in prompts: `@my-agent Do the thing`
 
 ## How It Works Under the Hood
 
-Swamr doesn't run a separate orchestration server or Python process. It works entirely through Cursor's native rule system (`.mdc` files):
+The `swamr` CLI is a Node.js/TypeScript tool that handles setup — cloning agent definitions, converting them to Cursor rules, and scaffolding the Obsidian brain vault. At runtime, the actual orchestration works through Cursor's native rule system (`.mdc` files):
 
-1. **`.cursor/rules/swamr-orchestrator.mdc`** — When you `@mention` this in chat, Cursor loads the orchestrator persona which knows how to plan, dispatch, and track
-2. **`.cursor/rules/<agent>.mdc`** — 150+ agent personas the orchestrator dispatches to via `@mentions`
-3. **`swamr/brain/`** — Obsidian vault on disk that agents read/write for context persistence
-4. **`swamr/state.json`** — JSON file tracking task progress for resume capability
+1. **`swamr init`** (TypeScript CLI) — Clones agency-agents, converts 232 agent definitions to `.mdc` rules, scaffolds the Obsidian vault, and configures the project
+2. **`.cursor/rules/swamr-orchestrator.mdc`** — When you `@mention` this in Cursor's Agent mode, it loads the orchestrator persona which knows how to plan, dispatch, and track
+3. **`.cursor/rules/<agent>.mdc`** — 232 agent personas the orchestrator dispatches to via `@mentions`
+4. **`swamr/brain/`** — Obsidian vault on disk that agents read/write for context persistence across phases
+5. **`swamr/state.json`** — JSON file tracking task progress for resume capability
 
-No external dependencies. No API keys. No running processes. Just Cursor + files.
+No running processes. No API keys. No external servers. Just a CLI for setup + Cursor + files.
 
 ---
 

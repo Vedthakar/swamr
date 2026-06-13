@@ -1,3 +1,6 @@
+# Dependencies
+node_modules/
+
 # Agency agents clone (downloaded during setup)
 .agency-agents/
 
