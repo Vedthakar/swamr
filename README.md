@@ -79,9 +79,29 @@ cursor ~/my-new-app
 # File → Open Vault → ~/my-new-app/swamr/brain/
 ```
 
-### 4. Build Something
+### 4. Switch Cursor to Agent Mode — REQUIRED
 
-In Cursor's chat:
+> **This is the most important step.** Swamr only works in **Agent mode**. Regular chat just writes text — it can't read files, run commands, or build anything.
+
+In Cursor's chat panel:
+
+1. Click the **`∞ Agent`** button in the bottom-left of the chat input (it will show a dropdown — select **Agent**)
+2. Leave the model on **Auto** (or pick claude-opus for best results on complex builds)
+3. Do **not** use Plan Mode (⇧ Tab) — that pauses for approval before every action and will slow the swarm to a crawl
+
+![Cursor Agent Mode](https://i.imgur.com/placeholder.png)
+
+Agent mode gives Cursor the ability to:
+- Read and write files in your project
+- Run terminal commands (`npm install`, `npx`, etc.)
+- Execute multiple steps in sequence without stopping
+- Retry and self-correct when something fails
+
+Without Agent mode, the `@swamr-orchestrator` prompt will just describe what it would do instead of actually doing it.
+
+### 5. Build Something
+
+With Agent mode active, type your prompt and hit send:
 
 ```
 @swamr-orchestrator Build me a project management tool with kanban boards, 
@@ -89,6 +109,14 @@ team collaboration, real-time updates, and Supabase backend.
 ```
 
 Watch the Obsidian vault fill up with architecture decisions, task outputs, and progress notes as the agents work.
+
+#### Quick reference: Cursor modes explained
+
+| Mode | What it does | Use for Swamr? |
+|------|-------------|----------------|
+| **∞ Agent** | Reads/writes files, runs commands, acts autonomously | ✅ YES — always use this |
+| Chat | Responds with text only, no file access | ❌ No |
+| Plan Mode (⇧ Tab) | Pauses before every action for approval | ⚠️ Only if you want step-by-step control |
 
 ---
 
