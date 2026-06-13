@@ -10,22 +10,35 @@ Drop Swamr into any project, tell it what to build, and watch 150+ specialist AI
 
 ## What It Does
 
-You type one sentence in Cursor. Swamr does the rest:
+### Two ways to build:
+
+**Option A: CLI Multi-Agent Mode (recommended)** — spawns real parallel agents via `cursor agent`:
+
+```bash
+swamr init ./my-app
+swamr build --dir ./my-app "A SaaS dashboard with auth, billing, and team management"
+```
+
+This spawns **actual separate Cursor agent processes** running in parallel — one per task. A planning agent decomposes your request into 25-40 tasks, then worker agents execute them simultaneously across foundation, build, test, harden, and launch phases.
+
+**Option B: Single-Agent Mode** — use `@swamr-orchestrator` in Cursor's chat:
 
 ```
 @swamr-orchestrator Build me a SaaS dashboard with user auth, 
 team management, billing via Stripe, and a REST API backed by Supabase.
 ```
 
-The orchestrator:
+This runs in one Cursor chat window. Simpler but sequential — one agent does everything by switching personas.
+
+### What happens either way:
+
 1. Creates an Obsidian vault (`swamr/brain/`) as the project's second brain
-2. Generates a full project plan with 30-50 tasks
+2. Generates a full project plan with 25-40 tasks
 3. Selects the right specialist agent for each task (frontend, backend, security, legal, testing...)
 4. Executes in strict phases — foundation, build, test, harden, launch
-5. Runs QA validation after every single task
-6. Retries failures up to 3x with specific feedback
-7. Writes every decision, output, and issue to the Obsidian brain
-8. Delivers a production-ready, tested codebase
+5. Retries failures up to 3x with specific feedback
+6. Writes every decision, output, and issue to the Obsidian brain
+7. Delivers a production-ready, tested codebase
 
 No context is lost between phases because every agent reads from and writes to the shared brain.
 
@@ -155,30 +168,61 @@ Watch the Obsidian vault fill up with architecture decisions, task outputs, and 
 
 ## Architecture
 
+### CLI Multi-Agent Mode (`swamr build`)
+
 ```
-You (describe what to build)
+swamr build "description"
   │
-  ▼
+  ├── PLANNER (1 cursor agent, smart model)
+  │   ├── Reads .cursor/rules/ to understand available agents
+  │   ├── Writes plan.md + tasks.json (25-40 tasks)
+  │   └── Writes architecture to swamr/brain/
+  │
+  ├── FOUNDATION PHASE (2-4 cursor agents in parallel)
+  │   ├── Agent 1: scaffold project
+  │   ├── Agent 2: database schema
+  │   ├── Agent 3: auth system
+  │   └── Agent 4: design system
+  │
+  ├── BUILD PHASE (up to 8 cursor agents in parallel)
+  │   ├── Agent: @frontend-developer → dashboard page
+  │   ├── Agent: @frontend-developer → settings page
+  │   ├── Agent: @backend-architect → API routes
+  │   ├── Agent: @frontend-developer → user profile
+  │   └── ... (tasks dispatched as dependencies resolve)
+  │
+  ├── TESTING PHASE (3-5 cursor agents in parallel)
+  │   ├── Agent: @evidence-collector → unit tests
+  │   ├── Agent: @api-tester → API tests
+  │   └── Agent: @testing-reality-checker → E2E tests
+  │
+  ├── HARDENING PHASE (4 cursor agents in parallel)
+  │   ├── Agent: @security-architect → security audit
+  │   ├── Agent: @performance-benchmarker → perf audit
+  │   ├── Agent: @accessibility-auditor → a11y audit
+  │   └── Agent: @legal-compliance-checker → compliance
+  │
+  └── LAUNCH PHASE (2-3 cursor agents)
+      ├── Agent: @engineering-technical-writer → docs
+      ├── Agent: @devops-automator → deploy
+      └── Agent: @testing-reality-checker → final validation
+```
+
+Each box is a **real separate `cursor agent` process** running in its own context. They share the codebase via the filesystem and the Obsidian brain vault.
+
+### Single-Agent Mode (`@swamr-orchestrator` in Cursor chat)
+
+```
 @swamr-orchestrator
   │
   ├── Initializes Obsidian brain (swamr/brain/)
-  │
   ├── @swamr-planner (decomposes into phased tasks)
-  │
   ├── @swamr-skill-selector (picks agent per task)
-  │
-  ├── FOR EACH phase:
-  │   ├── FOR EACH task in phase:
-  │   │   ├── Agent reads context from brain
-  │   │   ├── @[specialist-agent] builds it
-  │   │   ├── Agent writes output to brain
-  │   │   ├── @swamr-qa-loop validates it
-  │   │   └── Retry or advance
-  │   └── Write phase summary to brain
-  │
-  ├── @swamr-browser-agent (Supabase setup, OAuth, etc.)
-  │
-  └── @swamr-state-manager (tracks progress in swamr/state.json)
+  ├── FOR EACH phase → FOR EACH task:
+  │   ├── @[specialist-agent] builds it
+  │   ├── @swamr-qa-loop validates it
+  │   └── Retry or advance
+  └── @swamr-state-manager (tracks progress)
 ```
 
 ### The Obsidian Brain
@@ -232,13 +276,32 @@ The orchestrator automatically selects the right agent for each task based on th
 
 ## Usage Patterns
 
-### Build a full project from scratch
+### CLI Multi-Agent: Build a full project
+```bash
+swamr build --dir ./my-app "A habit tracking app with streaks, social accountability, and push notifications"
+```
+
+### CLI Multi-Agent: Plan only, review, then execute
+```bash
+# Generate the plan without executing
+swamr build --dir ./my-app --plan-only "An e-commerce platform with product catalog, cart, and Stripe payments"
+
+# Review swamr/plan.md and swamr/tasks.json, make changes, then:
+swamr build --dir ./my-app --resume
+```
+
+### CLI Multi-Agent: Resume after interruption
+```bash
+swamr build --dir ./my-app --resume
+```
+
+### Single-Agent: Build in Cursor chat
 ```
 @swamr-orchestrator Build me a habit tracking app with streaks, 
 social accountability, push notifications, and a React Native mobile client.
 ```
 
-### Plan first, review, then execute
+### Single-Agent: Plan first, review, then execute
 ```
 @swamr-planner Plan an e-commerce platform with product catalog, 
 cart, checkout, Stripe payments, and admin dashboard.
@@ -249,7 +312,7 @@ cart, checkout, Stripe payments, and admin dashboard.
 @swamr-orchestrator Execute the plan
 ```
 
-### Resume after closing Cursor
+### Resume in Cursor chat
 ```
 @swamr-orchestrator Resume the build
 ```
@@ -354,15 +417,37 @@ Reference it in prompts: `@my-agent Do the thing`
 
 ## How It Works Under the Hood
 
-The `swamr` CLI is a Node.js/TypeScript tool that handles setup — cloning agent definitions, converting them to Cursor rules, and scaffolding the Obsidian brain vault. At runtime, the actual orchestration works through Cursor's native rule system (`.mdc` files):
+### `swamr init` (setup)
 
-1. **`swamr init`** (TypeScript CLI) — Clones agency-agents, converts 232 agent definitions to `.mdc` rules, scaffolds the Obsidian vault, and configures the project
-2. **`.cursor/rules/swamr-orchestrator.mdc`** — When you `@mention` this in Cursor's Agent mode, it loads the orchestrator persona which knows how to plan, dispatch, and track
-3. **`.cursor/rules/<agent>.mdc`** — 232 agent personas the orchestrator dispatches to via `@mentions`
-4. **`swamr/brain/`** — Obsidian vault on disk that agents read/write for context persistence across phases
-5. **`swamr/state.json`** — JSON file tracking task progress for resume capability
+TypeScript CLI that clones agency-agents, converts 232 agent definitions to Cursor `.mdc` rules, scaffolds the Obsidian vault, and configures the project. Run once per project.
 
-No running processes. No API keys. No external servers. Just a CLI for setup + Cursor + files.
+### `swamr build` (multi-agent execution)
+
+TypeScript CLI that uses `cursor agent` to spawn **real parallel agent processes**:
+
+1. **Planning phase** — Spawns a single planning agent (smarter model) that reads the `.cursor/rules/` directory, decomposes the project into 25-40 tasks with dependencies, and writes `swamr/tasks.json` + `swamr/plan.md`
+2. **Execution phases** — For each phase (foundation → build → testing → hardening → launch), spawns up to `max_parallel_agents` (default: 8) `cursor agent` processes in parallel, each with its own task, role, and prompt
+3. **Dependency resolution** — Tasks only start when all their `depends_on` tasks are completed. New batches are dispatched as dependencies resolve.
+4. **Retry logic** — Failed tasks retry up to `max_retries_per_task` (default: 3) times with specific feedback about the failure
+5. **Brain integration** — Each agent gets the Obsidian brain context injected into its prompt. Task outputs are written to `swamr/brain/03-build/task-outputs/`. Phase summaries are written at the end of each phase.
+6. **Resume** — State is saved to `swamr/state.json` after every task. Use `swamr build --resume` to pick up where you left off.
+
+### Single-agent mode (`@swamr-orchestrator`)
+
+When you use Cursor's chat with `@swamr-orchestrator`, a single agent handles everything sequentially by switching between specialist personas via `@mentions`.
+
+### Key files
+
+| File | Purpose |
+|------|---------|
+| `swamr/tasks.json` | Machine-readable task list with dependencies |
+| `swamr/state.json` | Execution state for resume capability |
+| `swamr/plan.md` | Human-readable project plan |
+| `swamr/brain/` | Obsidian vault — shared memory between agents |
+| `swamr/config.json` | Agent limits, retry counts, phase config |
+| `.cursor/rules/*.mdc` | 232 agent personas + orchestrator rules |
+
+No external servers. No API keys. Just `cursor agent` CLI + files on disk.
 
 ---
 

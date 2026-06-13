@@ -6,6 +6,11 @@
   "bin": {
     "swamr": "./dist/cli.js"
   },
+  "files": [
+    "dist/",
+    "rules/",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
