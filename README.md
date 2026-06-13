@@ -62,24 +62,21 @@ No context is lost between phases because every agent reads from and writes to t
 ### 1. Install Swamr
 
 ```bash
-# Option A: Install directly from GitHub (recommended)
-npm install -g github:Vedthakar/swamr
-
-# Option B: Clone and link (if you want to modify Swamr itself)
 git clone https://github.com/Vedthakar/swamr.git ~/swamr
 cd ~/swamr
 npm install
-npm run build
 npm link
 ```
 
-After install, verify it works:
+Verify it works:
 
 ```bash
 swamr --help
 ```
 
 You should see the Swamr help menu with `init` and `build` commands.
+
+> **Note:** `npm link` wires the `swamr` command into whichever Node.js version is currently active in your shell. If you switch Node versions with nvm, run `npm link` again from `~/swamr`.
 
 ### 2. Initialize in Your Project
 
@@ -381,15 +378,11 @@ If you have MCP servers configured in Cursor, the agents use them automatically:
 ## Updating
 
 ```bash
-# If installed from GitHub
-npm install -g github:Vedthakar/swamr
-
-# If cloned locally
 cd ~/swamr
 git pull
-npm run build
+npm install
 
-# Then re-init any project to get the latest agents
+# Then re-init any project to get the latest agents and rules
 swamr init ~/path/to/your/project
 ```
 
