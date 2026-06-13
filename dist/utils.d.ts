@@ -15,3 +15,24 @@ export declare class Spinner {
     start(label?: string): void;
     stop(finalMessage?: string): void;
 }
+export interface ProgressTask {
+    id: string;
+    description: string;
+}
+export declare class ProgressDashboard {
+    private interval;
+    private frameIndex;
+    private messageIndex;
+    private renderedLines;
+    phase: string;
+    phaseIndex: number;
+    totalPhases: number;
+    phaseCompleted: number;
+    phaseTotal: number;
+    overallCompleted: number;
+    overallTotal: number;
+    activeTasks: ProgressTask[];
+    start(): void;
+    private render;
+    stop(): void;
+}

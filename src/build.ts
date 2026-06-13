@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, ChildProcess } from "node:child_process";
-import { info, warn, header, bold, writeFileDeep, runSafe, Spinner } from "./utils.js";
+import { info, warn, header, bold, writeFileDeep, runSafe, Spinner, ProgressDashboard, ProgressTask } from "./utils.js";
 
 interface TaskDef {
   id: string;
@@ -140,15 +140,14 @@ async function runTaskBatch(
   state: SwamrState,
   config: SwamrConfig,
   model: string,
-  trust: boolean = false
+  trust: boolean = false,
+  dashboard?: ProgressDashboard
 ): Promise<void> {
   const brainContext = buildBrainContext(projectDir);
 
-  // Run tasks in batches up to max_parallel_agents
   const pending = tasks.filter((t) => t.status === "pending" || t.status === "failed");
 
   while (pending.length > 0) {
-    // Find tasks whose dependencies are all completed
     const ready = pending.filter((t) =>
       t.depends_on.every((dep) => {
         const depTask = state.tasks.find((st) => st.id === dep);
@@ -163,36 +162,39 @@ async function runTaskBatch(
 
     const batch = ready.slice(0, config.max_parallel_agents);
 
-    header(`Running batch of ${batch.length} agents in parallel...`);
-    for (const t of batch) {
-      console.log(`  → ${t.id}: ${t.description} (agent: @${t.agent})`);
-    }
-
     const promises = batch.map(async (task) => {
       task.status = "in_progress";
       task.attempts++;
       saveState(projectDir, state);
 
-      const fullPrompt = buildTaskPrompt(task, brainContext, projectDir);
+      if (dashboard) {
+        dashboard.activeTasks = tasks
+          .filter((t) => t.status === "in_progress")
+          .map((t) => ({ id: t.id, description: t.description } as ProgressTask));
+      }
 
-      const spinner = new Spinner();
-      spinner.start(`[${task.id}] ${task.description}`);
+      const fullPrompt = buildTaskPrompt(task, brainContext, projectDir);
       const result = await runCursorAgent(projectDir, fullPrompt, model, trust);
 
       if (result.success) {
         task.status = "completed";
         task.output = result.output.slice(-500);
-        spinner.stop(`[${task.id}] Completed: ${task.description}`);
+        if (dashboard) {
+          dashboard.phaseCompleted++;
+          dashboard.overallCompleted++;
+        }
       } else {
         if (task.attempts >= config.max_retries_per_task) {
           task.status = "failed";
-          spinner.stop();
-          warn(`[${task.id}] Failed after ${task.attempts} attempts`);
         } else {
           task.status = "pending";
-          spinner.stop();
-          warn(`[${task.id}] Failed (attempt ${task.attempts}/${config.max_retries_per_task}), will retry`);
         }
+      }
+
+      if (dashboard) {
+        dashboard.activeTasks = tasks
+          .filter((t) => t.status === "in_progress")
+          .map((t) => ({ id: t.id, description: t.description } as ProgressTask));
       }
 
       // Write task output to brain
@@ -395,6 +397,16 @@ Create 25-40 tasks minimum. This should be a THOROUGH decomposition.`;
 
   // --- PHASE 2+: EXECUTE TASKS BY PHASE ---
   const phases = ["foundation", "build", "testing", "hardening", "launch"];
+  const totalTasks = state!.tasks.length;
+  const alreadyDone = state!.tasks.filter((t) => t.status === "completed").length;
+
+  const dashboard = new ProgressDashboard();
+  dashboard.totalPhases = phases.filter((p) => state!.tasks.some((t) => t.phase === p)).length;
+  dashboard.overallTotal = totalTasks;
+  dashboard.overallCompleted = alreadyDone;
+  dashboard.start();
+
+  let phaseCounter = 0;
 
   for (const phase of phases) {
     const phaseTasks = state!.tasks.filter((t) => t.phase === phase);
@@ -402,14 +414,20 @@ Create 25-40 tasks minimum. This should be a THOROUGH decomposition.`;
 
     const allDone = phaseTasks.every((t) => t.status === "completed");
     if (allDone) {
-      info(`Phase "${phase}" already complete, skipping`);
+      dashboard.overallCompleted += phaseTasks.length;
       continue;
     }
 
+    phaseCounter++;
     state!.current_phase = phase;
-    header(`Phase: ${phase.toUpperCase()} (${phaseTasks.length} tasks)`);
 
-    await runTaskBatch(projectDir, phaseTasks, state!, config, workerModel, trust);
+    dashboard.phase = phase;
+    dashboard.phaseIndex = phaseCounter;
+    dashboard.phaseCompleted = phaseTasks.filter((t) => t.status === "completed").length;
+    dashboard.phaseTotal = phaseTasks.length;
+    dashboard.activeTasks = [];
+
+    await runTaskBatch(projectDir, phaseTasks, state!, config, workerModel, trust, dashboard);
 
     // Write phase summary to brain
     const completed = phaseTasks.filter((t) => t.status === "completed").length;
@@ -443,9 +461,13 @@ ${failed > 0 ? `## Failed Tasks\n${phaseTasks.filter((t) => t.status === "failed
     saveState(projectDir, state!);
 
     if (failed > 0) {
+      dashboard.stop();
       warn(`Phase "${phase}" had ${failed} failed tasks`);
+      dashboard.start();
     }
   }
+
+  dashboard.stop();
 
   // --- DONE ---
   const totalCompleted = state!.tasks.filter((t) => t.status === "completed").length;

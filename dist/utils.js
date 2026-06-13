@@ -97,6 +97,17 @@ const SPINNER_MESSAGES = [
     "downloading more ram",
     "reading the room temperature",
 ];
+function cols() {
+    return process.stdout.columns ?? 80;
+}
+function truncate(text, maxLen) {
+    return text.length > maxLen ? text.slice(0, maxLen - 1) + "…" : text;
+}
+function progressBar(filled, total, width) {
+    const pct = total > 0 ? filled / total : 0;
+    const blocks = Math.round(pct * width);
+    return "█".repeat(blocks) + "░".repeat(width - blocks);
+}
 export class Spinner {
     interval = null;
     frameIndex = 0;
@@ -115,8 +126,10 @@ export class Spinner {
         this.interval = setInterval(() => {
             const frame = SPINNER_FRAMES[this.frameIndex % SPINNER_FRAMES.length];
             const msg = SPINNER_MESSAGES[this.messageIndex % SPINNER_MESSAGES.length];
-            const display = label ? `${label} — ${msg}` : msg;
-            process.stdout.write(`\r${CYAN}${frame}${RESET} ${display}  `);
+            const suffix = label ? `${label} — ${msg}` : msg;
+            // Truncate to terminal width so it never wraps
+            const line = truncate(`${frame} ${suffix}`, cols() - 1);
+            process.stdout.write(`\r${CYAN}${line}${RESET}\x1b[K`);
             this.frameIndex++;
             ticks++;
             if (ticks % 25 === 0) {
@@ -134,6 +147,87 @@ export class Spinner {
         }
         if (finalMessage) {
             info(finalMessage);
+        }
+    }
+}
+export class ProgressDashboard {
+    interval = null;
+    frameIndex = 0;
+    messageIndex = 0;
+    renderedLines = 0;
+    // mutable state updated from outside
+    phase = "";
+    phaseIndex = 0;
+    totalPhases = 0;
+    phaseCompleted = 0;
+    phaseTotal = 0;
+    overallCompleted = 0;
+    overallTotal = 0;
+    activeTasks = [];
+    start() {
+        if (!isTTY)
+            return;
+        this.messageIndex = Math.floor(Math.random() * SPINNER_MESSAGES.length);
+        this.interval = setInterval(() => this.render(), 100);
+    }
+    render() {
+        const w = cols();
+        const frame = SPINNER_FRAMES[this.frameIndex % SPINNER_FRAMES.length];
+        const quip = SPINNER_MESSAGES[this.messageIndex % SPINNER_MESSAGES.length];
+        // Move cursor up to overwrite previous render
+        if (this.renderedLines > 0) {
+            process.stdout.write(`\x1b[${this.renderedLines}A`);
+        }
+        const lines = [];
+        // ── Row 1: overall bar ──────────────────────────────────────────────────
+        const overallPct = this.overallTotal > 0
+            ? Math.round((this.overallCompleted / this.overallTotal) * 100)
+            : 0;
+        const barWidth = Math.max(10, Math.min(28, w - 52));
+        const bar = progressBar(this.overallCompleted, this.overallTotal, barWidth);
+        const overallLabel = `${BOLD}[${bar}]${RESET} ${String(overallPct).padStart(3)}%  overall ${this.overallCompleted}/${this.overallTotal} tasks`;
+        lines.push(truncate(overallLabel, w));
+        // ── Row 2: phase bar ────────────────────────────────────────────────────
+        const phasePct = this.phaseTotal > 0
+            ? Math.round((this.phaseCompleted / this.phaseTotal) * 100)
+            : 0;
+        const phaseBar = progressBar(this.phaseCompleted, this.phaseTotal, barWidth);
+        const phaseLabel = `${CYAN}[${phaseBar}]${RESET} ${String(phasePct).padStart(3)}%  phase ${this.phaseIndex}/${this.totalPhases}: ${this.phase.toUpperCase()} ${this.phaseCompleted}/${this.phaseTotal}`;
+        lines.push(truncate(phaseLabel, w));
+        // ── Row 3: quip ─────────────────────────────────────────────────────────
+        lines.push(truncate(`${CYAN}${frame}${RESET} ${quip}`, w));
+        // ── Rows 4+: active tasks (up to 6) ────────────────────────────────────
+        lines.push("");
+        const shown = this.activeTasks.slice(0, 6);
+        for (const t of shown) {
+            lines.push(truncate(`  ${CYAN}${frame}${RESET} [${t.id}] ${t.description}`, w));
+        }
+        // pad to always have 6 task rows so height stays stable
+        for (let i = shown.length; i < 6; i++) {
+            lines.push("");
+        }
+        for (const line of lines) {
+            process.stdout.write(line + "\x1b[K\n");
+        }
+        this.renderedLines = lines.length;
+        this.frameIndex++;
+        if (this.frameIndex % 20 === 0) {
+            this.messageIndex = (this.messageIndex + 1 + Math.floor(Math.random() * 3)) % SPINNER_MESSAGES.length;
+        }
+    }
+    stop() {
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+        // Clear the dashboard block
+        if (isTTY && this.renderedLines > 0) {
+            process.stdout.write(`\x1b[${this.renderedLines}A`);
+            for (let i = 0; i < this.renderedLines; i++) {
+                process.stdout.write("\x1b[K\n");
+            }
+            process.stdout.write(`\x1b[${this.renderedLines}A`);
+            this.renderedLines = 0;
         }
     }
 }
