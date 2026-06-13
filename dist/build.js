@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { info, warn, header, writeFileDeep, runSafe } from "./utils.js";
+import { info, warn, header, writeFileDeep, runSafe, Spinner } from "./utils.js";
 function loadConfig(projectDir) {
     const configPath = path.join(projectDir, "swamr", "config.json");
     if (fs.existsSync(configPath)) {
@@ -39,14 +39,14 @@ function buildBrainContext(projectDir) {
     }
     return context;
 }
-function runCursorAgent(projectDir, prompt, model = "sonnet-4") {
+function runCursorAgent(projectDir, prompt, model = "sonnet-4", trust = false) {
     return new Promise((resolve) => {
         const args = [
             "agent",
             "--print",
             "--output-format", "text",
             "--force",
-            "--trust",
+            ...(trust ? ["--trust"] : []),
             "--workspace", projectDir,
             "--model", model,
             prompt,
@@ -88,7 +88,7 @@ function runCursorAgent(projectDir, prompt, model = "sonnet-4") {
         }, 10 * 60 * 1000);
     });
 }
-async function runTaskBatch(projectDir, tasks, state, config, model) {
+async function runTaskBatch(projectDir, tasks, state, config, model, trust = false) {
     const brainContext = buildBrainContext(projectDir);
     // Run tasks in batches up to max_parallel_agents
     const pending = tasks.filter((t) => t.status === "pending" || t.status === "failed");
@@ -112,21 +112,24 @@ async function runTaskBatch(projectDir, tasks, state, config, model) {
             task.attempts++;
             saveState(projectDir, state);
             const fullPrompt = buildTaskPrompt(task, brainContext, projectDir);
-            info(`[${task.id}] Starting: ${task.description}`);
-            const result = await runCursorAgent(projectDir, fullPrompt, model);
+            const spinner = new Spinner();
+            spinner.start(`[${task.id}] ${task.description}`);
+            const result = await runCursorAgent(projectDir, fullPrompt, model, trust);
             if (result.success) {
                 task.status = "completed";
-                task.output = result.output.slice(-500); // keep last 500 chars
-                info(`[${task.id}] ✅ Completed`);
+                task.output = result.output.slice(-500);
+                spinner.stop(`[${task.id}] Completed: ${task.description}`);
             }
             else {
                 if (task.attempts >= config.max_retries_per_task) {
                     task.status = "failed";
-                    warn(`[${task.id}] ❌ Failed after ${task.attempts} attempts`);
+                    spinner.stop();
+                    warn(`[${task.id}] Failed after ${task.attempts} attempts`);
                 }
                 else {
-                    task.status = "pending"; // will retry
-                    warn(`[${task.id}] ⚠️  Failed (attempt ${task.attempts}/${config.max_retries_per_task}), will retry`);
+                    task.status = "pending";
+                    spinner.stop();
+                    warn(`[${task.id}] Failed (attempt ${task.attempts}/${config.max_retries_per_task}), will retry`);
                 }
             }
             // Write task output to brain
@@ -188,7 +191,8 @@ export async function build(targetDir, description, options = {}) {
     const projectDir = path.resolve(targetDir);
     const config = loadConfig(projectDir);
     const plannerModel = options.model ?? "sonnet-4";
-    const workerModel = "sonnet-4"; // workers always use fast model
+    const workerModel = "sonnet-4";
+    const trust = options.trust ?? false;
     // Check cursor agent is available
     const cursorCheck = runSafe("cursor agent --version");
     if (!cursorCheck) {
@@ -202,6 +206,7 @@ export async function build(targetDir, description, options = {}) {
     console.log(`  Workers:    up to ${config.max_parallel_agents} parallel agents`);
     console.log(`  Planner:    ${plannerModel}`);
     console.log(`  Workers:    ${workerModel}`);
+    console.log(`  Trust mode: ${trust ? "ON (auto-approve all commands)" : "OFF (agents will ask before running commands)"}`);
     console.log();
     // Check for existing state (resume)
     let state = loadState(projectDir);
@@ -214,7 +219,8 @@ export async function build(targetDir, description, options = {}) {
     else {
         // --- PHASE 1: PLANNING ---
         header("Phase 1: Planning (using orchestrator agent)");
-        info("Spawning planner agent to decompose the project...");
+        const planSpinner = new Spinner();
+        planSpinner.start("Planning your project");
         const planPrompt = `You are the Swamr Orchestrator. Read the rules at .cursor/rules/swamr-orchestrator.mdc and .cursor/rules/swamr-planner.mdc.
 
 The user wants to build: ${description}
@@ -265,12 +271,14 @@ Assign the right agent slug from the .cursor/rules/ files.
 Make the dependency graph correct — nothing starts before its dependencies.
 
 Create 25-40 tasks minimum. This should be a THOROUGH decomposition.`;
-        const planResult = await runCursorAgent(projectDir, planPrompt, plannerModel);
+        const planResult = await runCursorAgent(projectDir, planPrompt, plannerModel, trust);
         if (!planResult.success) {
+            planSpinner.stop();
             console.error("❌ Planning failed. Output:");
             console.error(planResult.output);
             process.exit(1);
         }
+        planSpinner.stop("Planning complete");
         // Parse tasks.json
         const tasksPath = path.join(projectDir, "swamr", "tasks.json");
         if (!fs.existsSync(tasksPath)) {
@@ -312,7 +320,7 @@ Create 25-40 tasks minimum. This should be a THOROUGH decomposition.`;
         }
         state.current_phase = phase;
         header(`Phase: ${phase.toUpperCase()} (${phaseTasks.length} tasks)`);
-        await runTaskBatch(projectDir, phaseTasks, state, config, workerModel);
+        await runTaskBatch(projectDir, phaseTasks, state, config, workerModel, trust);
         // Write phase summary to brain
         const completed = phaseTasks.filter((t) => t.status === "completed").length;
         const failed = phaseTasks.filter((t) => t.status === "failed").length;

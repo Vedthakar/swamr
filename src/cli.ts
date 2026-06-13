@@ -3,7 +3,7 @@
 import { init } from "./init.js";
 import { build } from "./build.js";
 
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 
 function printUsage() {
   console.log(`
@@ -28,10 +28,13 @@ Commands:
       --model <model>    Model for planning agent (default: sonnet-4)
       --plan-only        Generate the plan but don't execute
       --resume           Resume from existing swamr/state.json
+      --trust            Auto-approve all agent commands (skip approval prompts)
+                         Without this flag, agents will ask before running commands.
 
 Examples:
   swamr init ./my-app
   swamr build "A SaaS dashboard with auth, billing, and team management"
+  swamr build --trust "A SaaS dashboard with auth, billing, and team management"
   swamr build --dir ./my-app --plan-only "Recipe sharing app with social features"
   swamr build --resume --dir ./my-app
 `);
@@ -65,6 +68,7 @@ async function main() {
       let model: string | undefined;
       let planOnly = false;
       let resume = false;
+      let trust = false;
       let description = "";
 
       for (let i = 0; i < buildArgs.length; i++) {
@@ -81,6 +85,9 @@ async function main() {
           case "--resume":
             resume = true;
             break;
+          case "--trust":
+            trust = true;
+            break;
           default:
             if (!buildArgs[i].startsWith("--")) {
               description = buildArgs[i];
@@ -96,6 +103,7 @@ async function main() {
       await build(dir, description || "Resume previous build", {
         model,
         plan_only: planOnly,
+        trust,
       });
       break;
     }

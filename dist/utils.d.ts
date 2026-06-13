@@ -7,3 +7,11 @@ export declare function runSafe(cmd: string, cwd?: string): string | null;
 export declare function writeFileDeep(filePath: string, content: string): void;
 export declare function copyDirRecursive(src: string, dest: string): void;
 export declare function commandExists(cmd: string): boolean;
+export declare class Spinner {
+    private interval;
+    private frameIndex;
+    private messageIndex;
+    constructor();
+    start(label?: string): void;
+    stop(finalMessage?: string): void;
+}

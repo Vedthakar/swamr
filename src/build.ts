@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, ChildProcess } from "node:child_process";
-import { info, warn, header, bold, writeFileDeep, runSafe } from "./utils.js";
+import { info, warn, header, bold, writeFileDeep, runSafe, Spinner } from "./utils.js";
 
 interface TaskDef {
   id: string;
@@ -75,7 +75,8 @@ function buildBrainContext(projectDir: string): string {
 function runCursorAgent(
   projectDir: string,
   prompt: string,
-  model: string = "sonnet-4"
+  model: string = "sonnet-4",
+  trust: boolean = false
 ): Promise<{ success: boolean; output: string }> {
   return new Promise((resolve) => {
     const args = [
@@ -83,7 +84,7 @@ function runCursorAgent(
       "--print",
       "--output-format", "text",
       "--force",
-      "--trust",
+      ...(trust ? ["--trust"] : []),
       "--workspace", projectDir,
       "--model", model,
       prompt,
@@ -138,7 +139,8 @@ async function runTaskBatch(
   tasks: TaskDef[],
   state: SwamrState,
   config: SwamrConfig,
-  model: string
+  model: string,
+  trust: boolean = false
 ): Promise<void> {
   const brainContext = buildBrainContext(projectDir);
 
@@ -173,20 +175,23 @@ async function runTaskBatch(
 
       const fullPrompt = buildTaskPrompt(task, brainContext, projectDir);
 
-      info(`[${task.id}] Starting: ${task.description}`);
-      const result = await runCursorAgent(projectDir, fullPrompt, model);
+      const spinner = new Spinner();
+      spinner.start(`[${task.id}] ${task.description}`);
+      const result = await runCursorAgent(projectDir, fullPrompt, model, trust);
 
       if (result.success) {
         task.status = "completed";
-        task.output = result.output.slice(-500); // keep last 500 chars
-        info(`[${task.id}] ✅ Completed`);
+        task.output = result.output.slice(-500);
+        spinner.stop(`[${task.id}] Completed: ${task.description}`);
       } else {
         if (task.attempts >= config.max_retries_per_task) {
           task.status = "failed";
-          warn(`[${task.id}] ❌ Failed after ${task.attempts} attempts`);
+          spinner.stop();
+          warn(`[${task.id}] Failed after ${task.attempts} attempts`);
         } else {
-          task.status = "pending"; // will retry
-          warn(`[${task.id}] ⚠️  Failed (attempt ${task.attempts}/${config.max_retries_per_task}), will retry`);
+          task.status = "pending";
+          spinner.stop();
+          warn(`[${task.id}] Failed (attempt ${task.attempts}/${config.max_retries_per_task}), will retry`);
         }
       }
 
@@ -257,12 +262,13 @@ Begin working now. Complete the task fully.`;
 export async function build(
   targetDir: string,
   description: string,
-  options: { model?: string; plan_only?: boolean } = {}
+  options: { model?: string; plan_only?: boolean; trust?: boolean } = {}
 ) {
   const projectDir = path.resolve(targetDir);
   const config = loadConfig(projectDir);
   const plannerModel = options.model ?? "sonnet-4";
-  const workerModel = "sonnet-4"; // workers always use fast model
+  const workerModel = "sonnet-4";
+  const trust = options.trust ?? false;
 
   // Check cursor agent is available
   const cursorCheck = runSafe("cursor agent --version");
@@ -278,6 +284,7 @@ export async function build(
   console.log(`  Workers:    up to ${config.max_parallel_agents} parallel agents`);
   console.log(`  Planner:    ${plannerModel}`);
   console.log(`  Workers:    ${workerModel}`);
+  console.log(`  Trust mode: ${trust ? "ON (auto-approve all commands)" : "OFF (agents will ask before running commands)"}`);
   console.log();
 
   // Check for existing state (resume)
@@ -290,7 +297,8 @@ export async function build(
   } else {
     // --- PHASE 1: PLANNING ---
     header("Phase 1: Planning (using orchestrator agent)");
-    info("Spawning planner agent to decompose the project...");
+    const planSpinner = new Spinner();
+    planSpinner.start("Planning your project");
 
     const planPrompt = `You are the Swamr Orchestrator. Read the rules at .cursor/rules/swamr-orchestrator.mdc and .cursor/rules/swamr-planner.mdc.
 
@@ -343,13 +351,15 @@ Make the dependency graph correct — nothing starts before its dependencies.
 
 Create 25-40 tasks minimum. This should be a THOROUGH decomposition.`;
 
-    const planResult = await runCursorAgent(projectDir, planPrompt, plannerModel);
+    const planResult = await runCursorAgent(projectDir, planPrompt, plannerModel, trust);
 
     if (!planResult.success) {
+      planSpinner.stop();
       console.error("❌ Planning failed. Output:");
       console.error(planResult.output);
       process.exit(1);
     }
+    planSpinner.stop("Planning complete");
 
     // Parse tasks.json
     const tasksPath = path.join(projectDir, "swamr", "tasks.json");
@@ -399,7 +409,7 @@ Create 25-40 tasks minimum. This should be a THOROUGH decomposition.`;
     state!.current_phase = phase;
     header(`Phase: ${phase.toUpperCase()} (${phaseTasks.length} tasks)`);
 
-    await runTaskBatch(projectDir, phaseTasks, state!, config, workerModel);
+    await runTaskBatch(projectDir, phaseTasks, state!, config, workerModel, trust);
 
     // Write phase summary to brain
     const completed = phaseTasks.filter((t) => t.status === "completed").length;

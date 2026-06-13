@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { info, warn, header, bold, run, runSafe, writeFileDeep, commandExists, } from "./utils.js";
+import { info, warn, header, bold, run, runSafe, writeFileDeep, commandExists, Spinner, } from "./utils.js";
 import { initBrain } from "./brain.js";
 const AGENCY_REPO = "https://github.com/msitarzewski/agency-agents.git";
 export function init(targetDir) {
@@ -25,13 +25,17 @@ export function init(targetDir) {
     }
     else {
         header("Cloning agency-agents...");
+        const spinner = new Spinner();
+        spinner.start("Cloning 150+ agent definitions");
         run(`git clone --depth 1 ${AGENCY_REPO} ${agencyDir}`);
-        info("Cloned agency-agents");
+        spinner.stop("Cloned agency-agents");
     }
     // --- Step 2: Convert agents to Cursor format ---
     header("Converting agents to Cursor rules...");
+    const convertSpinner = new Spinner();
+    convertSpinner.start("Converting agents");
     run("bash scripts/convert.sh --tool cursor", agencyDir);
-    info("Converted all agents");
+    convertSpinner.stop("Converted all agents");
     // --- Step 3: Install rules into project ---
     header("Installing Cursor rules into project...");
     const rulesDir = path.join(projectDir, ".cursor", "rules");

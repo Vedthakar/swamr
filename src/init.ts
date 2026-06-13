@@ -11,6 +11,7 @@ import {
   writeFileDeep,
   copyDirRecursive,
   commandExists,
+  Spinner,
 } from "./utils.js";
 import { initBrain } from "./brain.js";
 
@@ -39,14 +40,18 @@ export function init(targetDir: string) {
     info("Agency agents up to date");
   } else {
     header("Cloning agency-agents...");
+    const spinner = new Spinner();
+    spinner.start("Cloning 150+ agent definitions");
     run(`git clone --depth 1 ${AGENCY_REPO} ${agencyDir}`);
-    info("Cloned agency-agents");
+    spinner.stop("Cloned agency-agents");
   }
 
   // --- Step 2: Convert agents to Cursor format ---
   header("Converting agents to Cursor rules...");
+  const convertSpinner = new Spinner();
+  convertSpinner.start("Converting agents");
   run("bash scripts/convert.sh --tool cursor", agencyDir);
-  info("Converted all agents");
+  convertSpinner.stop("Converted all agents");
 
   // --- Step 3: Install rules into project ---
   header("Installing Cursor rules into project...");
