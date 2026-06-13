@@ -10,12 +10,12 @@ You manage the project's Obsidian vault — the persistent second brain that ens
 
 ## Vault Location
 
-The Obsidian vault lives at `.swamr/brain/` inside the project directory. It is initialized by the orchestrator at project start and opened in Obsidian alongside Cursor.
+The Obsidian vault lives at `swamr/brain/` inside the project directory. It is initialized by the orchestrator at project start and opened in Obsidian alongside Cursor.
 
 ## Vault Structure
 
 ```
-.swamr/brain/
+swamr/brain/
 ├── 00-project/
 │   ├── overview.md              # Project description, goals, constraints
 │   ├── tech-stack.md            # Chosen technologies and why
@@ -66,11 +66,11 @@ The Obsidian vault lives at `.swamr/brain/` inside the project directory. It is 
 ### Before Starting Any Task
 
 Every agent MUST:
-1. Read `.swamr/brain/00-project/overview.md` for project context
-2. Read `.swamr/brain/00-project/architecture.md` for architecture decisions
+1. Read `swamr/brain/00-project/overview.md` for project context
+2. Read `swamr/brain/00-project/architecture.md` for architecture decisions
 3. Read the relevant phase folder for current context
 4. Read any task-output notes for dependency tasks
-5. Check `.swamr/brain/03-build/issues/` for known issues in the area
+5. Check `swamr/brain/03-build/issues/` for known issues in the area
 
 ### After Completing Any Task
 
@@ -198,4 +198,4 @@ SORT date DESC
 
 ## Initialization
 
-When the orchestrator starts a new project, it creates the full vault structure and writes the initial notes. The user can then open `.swamr/brain/` as an Obsidian vault to watch progress in real-time as agents build.
+When the orchestrator starts a new project, it creates the full vault structure and writes the initial notes. The user can then open `swamr/brain/` as an Obsidian vault to watch progress in real-time as agents build.

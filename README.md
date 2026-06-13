@@ -18,7 +18,7 @@ team management, billing via Stripe, and a REST API backed by Supabase.
 ```
 
 The orchestrator:
-1. Creates an Obsidian vault (`.swamr/brain/`) as the project's second brain
+1. Creates an Obsidian vault (`swamr/brain/`) as the project's second brain
 2. Generates a full project plan with 30-50 tasks
 3. Selects the right specialist agent for each task (frontend, backend, security, legal, testing...)
 4. Executes in strict phases — foundation, build, test, harden, launch
@@ -76,7 +76,7 @@ This does everything:
 cursor ~/my-new-app
 
 # Open the brain vault in Obsidian
-# File → Open Vault → ~/my-new-app/.swamr/brain/
+# File → Open Vault → ~/my-new-app/swamr/brain/
 ```
 
 ### 4. Build Something
@@ -105,14 +105,14 @@ Watch the Obsidian vault fill up with architecture decisions, task outputs, and 
    @swamr-planner Plan a recipe sharing app with social features, 
    meal planning, and grocery list generation.
    ```
-   Review `.swamr/plan.md`, make changes, then:
+   Review `swamr/plan.md`, make changes, then:
    ```
    @swamr-orchestrator Execute the plan
    ```
 
 3. **Define your phases clearly** — The agents work best when they know the full scope upfront. A vague "build me something cool" produces worse results than "Build a Next.js app with these 5 pages, this database schema, and this auth flow."
 
-4. **Watch the Obsidian vault** — Open `.swamr/brain/` in Obsidian to see decisions being made in real-time. If you see the agents going in the wrong direction, you can intervene early.
+4. **Watch the Obsidian vault** — Open `swamr/brain/` in Obsidian to see decisions being made in real-time. If you see the agents going in the wrong direction, you can intervene early.
 
 5. **Let phases complete** — The system works in strict phases (foundation → build → test → harden → launch). Each phase summary carries context forward. Don't skip phases.
 
@@ -126,7 +126,7 @@ You (describe what to build)
   ▼
 @swamr-orchestrator
   │
-  ├── Initializes Obsidian brain (.swamr/brain/)
+  ├── Initializes Obsidian brain (swamr/brain/)
   │
   ├── @swamr-planner (decomposes into phased tasks)
   │
@@ -143,7 +143,7 @@ You (describe what to build)
   │
   ├── @swamr-browser-agent (Supabase setup, OAuth, etc.)
   │
-  └── @swamr-state-manager (tracks progress in .swamr/state.json)
+  └── @swamr-state-manager (tracks progress in swamr/state.json)
 ```
 
 ### The Obsidian Brain
@@ -151,7 +151,7 @@ You (describe what to build)
 The brain is what makes Swamr different from just using Cursor normally. It's a structured Obsidian vault that agents use as shared memory:
 
 ```
-.swamr/brain/
+swamr/brain/
 ├── 00-project/          # What we're building and why
 │   ├── overview.md
 │   ├── tech-stack.md
@@ -208,7 +208,7 @@ social accountability, push notifications, and a React Native mobile client.
 @swamr-planner Plan an e-commerce platform with product catalog, 
 cart, checkout, Stripe payments, and admin dashboard.
 
-# Review .swamr/plan.md and .swamr/brain/01-planning/task-tree.md
+# Review swamr/plan.md and swamr/brain/01-planning/task-tree.md
 # Make any changes you want, then:
 
 @swamr-orchestrator Execute the plan
@@ -218,7 +218,7 @@ cart, checkout, Stripe payments, and admin dashboard.
 ```
 @swamr-orchestrator Resume the build
 ```
-The orchestrator reads `.swamr/state.json` and the latest brain notes to pick up exactly where it left off.
+The orchestrator reads `swamr/state.json` and the latest brain notes to pick up exactly where it left off.
 
 ### Check progress
 ```
@@ -236,7 +236,7 @@ The orchestrator reads `.swamr/state.json` and the latest brain notes to pick up
 
 ## Configuration
 
-Edit `.swamr/config.json` to customize behavior:
+Edit `swamr/config.json` to customize behavior:
 
 ```json
 {
@@ -318,8 +318,8 @@ Swamr doesn't run a separate orchestration server or Python process. It works en
 
 1. **`.cursor/rules/swamr-orchestrator.mdc`** — When you `@mention` this in chat, Cursor loads the orchestrator persona which knows how to plan, dispatch, and track
 2. **`.cursor/rules/<agent>.mdc`** — 150+ agent personas the orchestrator dispatches to via `@mentions`
-3. **`.swamr/brain/`** — Obsidian vault on disk that agents read/write for context persistence
-4. **`.swamr/state.json`** — JSON file tracking task progress for resume capability
+3. **`swamr/brain/`** — Obsidian vault on disk that agents read/write for context persistence
+4. **`swamr/state.json`** — JSON file tracking task progress for resume capability
 
 No external dependencies. No API keys. No running processes. Just Cursor + files.
 

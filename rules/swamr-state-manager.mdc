@@ -1,5 +1,5 @@
 ---
-description: "Swamr State Manager — tracks task progress, manages the execution pipeline, handles retries and escalation. Maintains .swamr/state.json as the single source of truth for swarm progress."
+description: "Swamr State Manager — tracks task progress, manages the execution pipeline, handles retries and escalation. Maintains swamr/state.json as the single source of truth for swarm progress."
 globs: ""
 alwaysApply: false
 ---
@@ -8,7 +8,7 @@ alwaysApply: false
 
 You manage the execution state of the Swamr pipeline. You are the memory of the swarm.
 
-## State File: `.swamr/state.json`
+## State File: `swamr/state.json`
 
 ```json
 {
@@ -73,7 +73,7 @@ You manage the execution state of the Swamr pipeline. You are the memory of the 
 
 ### Initialize State
 When starting a new project from a plan:
-1. Read `.swamr/plan.md`
+1. Read `swamr/plan.md`
 2. Parse all tasks with their dependencies
 3. Create the initial `state.json`
 4. Set first foundation task as `current_task`
@@ -133,7 +133,7 @@ Phase: [current phase] | Tasks: [completed]/[total] | Status: [on_track/delayed/
 ## Recovery
 
 If the conversation is lost or Cursor restarts:
-1. Read `.swamr/state.json` to restore pipeline state
+1. Read `swamr/state.json` to restore pipeline state
 2. Check git log for recent commits to verify completed work
 3. Resume from the `current_task`
 4. The orchestrator can always be re-invoked with "Resume the build"

@@ -76,9 +76,9 @@ info "Installed swamr orchestrator rules"
 header "Setting up project config..."
 
 # Create swamr config if it doesn't exist
-if [[ ! -f "$PROJECT_DIR/.swamr/config.json" ]]; then
-  mkdir -p "$PROJECT_DIR/.swamr"
-  cat > "$PROJECT_DIR/.swamr/config.json" <<'JSON'
+if [[ ! -f "$PROJECT_DIR/swamr/config.json" ]]; then
+  mkdir -p "$PROJECT_DIR/swamr"
+  cat > "$PROJECT_DIR/swamr/config.json" <<'JSON'
 {
   "version": "1.0.0",
   "max_parallel_agents": 8,
@@ -105,26 +105,26 @@ if [[ ! -f "$PROJECT_DIR/.swamr/config.json" ]]; then
   }
 }
 JSON
-  info "Created .swamr/config.json"
+  info "Created swamr/config.json"
 else
   info "Config already exists, skipping"
 fi
 
 # Create gitignore for swamr state
-if [[ ! -f "$PROJECT_DIR/.swamr/.gitignore" ]]; then
-  cat > "$PROJECT_DIR/.swamr/.gitignore" <<'GITIGNORE'
+if [[ ! -f "$PROJECT_DIR/swamr/.gitignore" ]]; then
+  cat > "$PROJECT_DIR/swamr/.gitignore" <<'GITIGNORE'
 state.json
 evidence/
 scripts/
 logs/
 *.lock
 GITIGNORE
-  info "Created .swamr/.gitignore"
+  info "Created swamr/.gitignore"
 fi
 
 # --- Step 5: Initialize Obsidian Brain ---
 header "Setting up Obsidian brain vault..."
-BRAIN_DIR="$PROJECT_DIR/.swamr/brain"
+BRAIN_DIR="$PROJECT_DIR/swamr/brain"
 if [[ ! -d "$BRAIN_DIR" ]]; then
   mkdir -p "$BRAIN_DIR"/{00-project,01-planning,01-planning/decisions,02-foundation,03-build,03-build/task-outputs,03-build/issues,04-testing,05-hardening,06-launch,templates}
 
@@ -376,7 +376,7 @@ MD
 }
 JSON
 
-  info "Created Obsidian brain vault at .swamr/brain/"
+  info "Created Obsidian brain vault at swamr/brain/"
 else
   info "Obsidian brain already exists, skipping"
 fi
@@ -417,5 +417,5 @@ echo "    • Run dev↔QA loops until each task passes"
 echo "    • Handle browser setup (Supabase, etc.) via Playwright"
 echo "    • Produce a production-ready, tested codebase"
 echo ""
-echo "  ${BOLD}Open .swamr/brain/ as an Obsidian vault to watch progress live!${RESET}"
+echo "  ${BOLD}Open swamr/brain/ as an Obsidian vault to watch progress live!${RESET}"
 echo ""

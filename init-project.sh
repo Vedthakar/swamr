@@ -45,18 +45,18 @@ fi
 
 # Create .gitignore entries for swamr
 if [[ -f "$PROJECT_DIR/.gitignore" ]]; then
-  if ! grep -q '.swamr/state' "$PROJECT_DIR/.gitignore" 2>/dev/null; then
+  if ! grep -q 'swamr/state' "$PROJECT_DIR/.gitignore" 2>/dev/null; then
     cat >> "$PROJECT_DIR/.gitignore" <<'EOF'
 
 # Swamr agent state (ephemeral)
-.swamr/state.json
-.swamr/evidence/
-.swamr/scripts/
-.swamr/logs/
+swamr/state.json
+swamr/evidence/
+swamr/scripts/
+swamr/logs/
 
 # Obsidian internals (vault content IS tracked)
-.swamr/brain/.obsidian/workspace.json
-.swamr/brain/.obsidian/workspace-mobile.json
+swamr/brain/.obsidian/workspace.json
+swamr/brain/.obsidian/workspace-mobile.json
 EOF
     info "Updated .gitignore"
   fi
@@ -68,14 +68,14 @@ node_modules/
 .env.*.local
 
 # Swamr agent state (ephemeral)
-.swamr/state.json
-.swamr/evidence/
-.swamr/scripts/
-.swamr/logs/
+swamr/state.json
+swamr/evidence/
+swamr/scripts/
+swamr/logs/
 
 # Obsidian internals (vault content IS tracked)
-.swamr/brain/.obsidian/workspace.json
-.swamr/brain/.obsidian/workspace-mobile.json
+swamr/brain/.obsidian/workspace.json
+swamr/brain/.obsidian/workspace-mobile.json
 EOF
   info "Created .gitignore"
 fi
@@ -84,6 +84,6 @@ echo ""
 header "✅ Ready!"
 echo ""
 echo "  1. Open this folder in Cursor"
-echo "  2. Open .swamr/brain/ as an Obsidian vault"
+echo "  2. Open swamr/brain/ as an Obsidian vault"
 echo "  3. Type: @swamr-orchestrator Build me [your app]"
 echo ""

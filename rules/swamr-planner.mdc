@@ -43,7 +43,7 @@ Build a dependency graph. Tasks are executed in topological order:
 
 ## Output Format
 
-Write the plan to `.swamr/plan.md` with this exact structure:
+Write the plan to `swamr/plan.md` with this exact structure:
 
 ```markdown
 # Project Plan: [Name]

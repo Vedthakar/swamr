@@ -87,9 +87,9 @@ After validation, produce a verdict:
 Include file paths, line numbers, and exact expected behavior.]
 
 ### Evidence
-- Screenshot: .swamr/evidence/[task-id]-screenshot.png
-- Test output: .swamr/evidence/[task-id]-tests.log
-- Build output: .swamr/evidence/[task-id]-build.log
+- Screenshot: swamr/evidence/[task-id]-screenshot.png
+- Test output: swamr/evidence/[task-id]-tests.log
+- Build output: swamr/evidence/[task-id]-build.log
 ```
 
 ## Decision Rules
@@ -101,7 +101,7 @@ Include file paths, line numbers, and exact expected behavior.]
 ## Retry Protocol
 
 When a task FAILs:
-1. Save the verdict to `.swamr/evidence/[task-id]-qa-attempt-[N].md`
+1. Save the verdict to `swamr/evidence/[task-id]-qa-attempt-[N].md`
 2. The orchestrator re-dispatches to the same agent with:
    - The original task description
    - The QA feedback (specific issues to fix)
@@ -114,9 +114,9 @@ When a task FAILs:
 
 ## Evidence Collection
 
-Save all evidence to `.swamr/evidence/`:
+Save all evidence to `swamr/evidence/`:
 ```
-.swamr/evidence/
+swamr/evidence/
 ├── F1-build.log
 ├── F1-tests.log
 ├── B1-screenshot-desktop.png

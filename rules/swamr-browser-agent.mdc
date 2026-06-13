@@ -31,7 +31,7 @@ npx playwright install chromium
 
 ## Script Pattern
 
-All browser automation scripts go in `.swamr/scripts/` and follow this pattern:
+All browser automation scripts go in `swamr/scripts/` and follow this pattern:
 
 ```typescript
 import { chromium } from 'playwright';
@@ -53,7 +53,7 @@ async function main() {
 
     // Take evidence screenshot
     await page.screenshot({
-      path: path.join('.swamr', 'evidence', 'setup-complete.png'),
+      path: path.join('swamr', 'evidence', 'setup-complete.png'),
       fullPage: true
     });
 
@@ -61,7 +61,7 @@ async function main() {
   } catch (error) {
     // Screenshot on failure for debugging
     await page.screenshot({
-      path: path.join('.swamr', 'evidence', 'error-screenshot.png'),
+      path: path.join('swamr', 'evidence', 'error-screenshot.png'),
       fullPage: true
     });
     console.error('❌ Failed:', error.message);
@@ -97,7 +97,7 @@ When the Supabase CLI or MCP is not available:
 1. Start the dev server
 2. Navigate to each page/route
 3. Take screenshots at desktop, tablet, and mobile viewports
-4. Save to `.swamr/evidence/`
+4. Save to `swamr/evidence/`
 5. Compare against baseline if available
 
 ## Security Rules

@@ -31,7 +31,7 @@ tests/                  # Test files
 ├── unit/               # Unit tests
 ├── integration/        # Integration tests
 └── e2e/                # Playwright E2E tests
-.swamr/                 # Swarm state
+swamr/                 # Swarm state
 ├── brain/              # Obsidian vault — the second brain (tracked in git)
 │   ├── 00-project/     # Project overview, architecture, tech stack
 │   ├── 01-planning/    # Requirements, task tree, decisions
@@ -62,17 +62,17 @@ tests/                  # Test files
 ## Obsidian Brain Protocol (MANDATORY for all agents)
 
 ### Before Starting ANY Task
-1. Read `.swamr/brain/00-project/overview.md` for project context
-2. Read `.swamr/brain/00-project/architecture.md` for architecture decisions
+1. Read `swamr/brain/00-project/overview.md` for project context
+2. Read `swamr/brain/00-project/architecture.md` for architecture decisions
 3. Read task output notes for any tasks this task depends on
-4. Check `.swamr/brain/03-build/issues/` for known issues in your area
+4. Check `swamr/brain/03-build/issues/` for known issues in your area
 
 ### After Completing ANY Task
-1. Write a task output note to `.swamr/brain/03-build/task-outputs/[task-id].md`
-   (Use the template at `.swamr/brain/templates/task-output.md`)
-2. Update `.swamr/brain/03-build/phase-log.md` with a one-line entry
-3. If you made an architecture decision, write an ADR to `.swamr/brain/01-planning/decisions/`
-4. If you found an issue, log it to `.swamr/brain/03-build/issues/`
+1. Write a task output note to `swamr/brain/03-build/task-outputs/[task-id].md`
+   (Use the template at `swamr/brain/templates/task-output.md`)
+2. Update `swamr/brain/03-build/phase-log.md` with a one-line entry
+3. If you made an architecture decision, write an ADR to `swamr/brain/01-planning/decisions/`
+4. If you found an issue, log it to `swamr/brain/03-build/issues/`
 
 This is non-negotiable. The brain is how agents pass context to each other across phases without losing information.
 
@@ -84,7 +84,7 @@ When an agent completes a task, it MUST:
 3. Describe what was implemented
 4. Note any assumptions made
 5. Flag any issues or concerns for the QA loop
-6. Update `.swamr/state.json` with task status
+6. Update `swamr/state.json` with task status
 
 ## Handoff Format
 
