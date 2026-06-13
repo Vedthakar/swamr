@@ -1,0 +1,115 @@
+---
+description: "Swamr Project Rules — always-on rules that apply to every agent in the swarm. Enforces coding standards, file organization, and communication protocols across all specialist agents."
+globs: "**/*"
+alwaysApply: true
+---
+
+# 🐝 Swamr Project Rules
+
+These rules apply to ALL agents operating within this project.
+
+## File Organization
+
+```
+src/                    # Application source code
+├── app/                # Next.js App Router pages
+├── components/         # Reusable UI components
+│   ├── ui/             # Base design system (shadcn/ui)
+│   └── [feature]/      # Feature-specific components
+├── lib/                # Shared utilities and helpers
+├── hooks/              # Custom React hooks
+├── types/              # TypeScript type definitions
+├── styles/             # Global styles
+└── server/             # Server-only code
+    ├── actions/        # Server Actions
+    ├── db/             # Database queries and schema
+    └── api/            # API route handlers
+supabase/               # Supabase config and migrations
+├── migrations/         # SQL migration files
+└── seed.sql            # Seed data
+tests/                  # Test files
+├── unit/               # Unit tests
+├── integration/        # Integration tests
+└── e2e/                # Playwright E2E tests
+.swamr/                 # Swarm state
+├── brain/              # Obsidian vault — the second brain (tracked in git)
+│   ├── 00-project/     # Project overview, architecture, tech stack
+│   ├── 01-planning/    # Requirements, task tree, decisions
+│   ├── 02-foundation/  # Foundation phase outputs
+│   ├── 03-build/       # Build phase task outputs and issues
+│   ├── 04-testing/     # Test plans and results
+│   ├── 05-hardening/   # Security, perf, a11y, legal reports
+│   ├── 06-launch/      # Deploy runbooks and handoff docs
+│   └── templates/      # Note templates for agents
+├── plan.md             # Project plan
+├── state.json          # Execution state (gitignored)
+├── evidence/           # QA screenshots and logs (gitignored)
+├── scripts/            # Browser automation scripts (gitignored)
+└── config.json         # Swarm configuration
+```
+
+## Coding Standards (All Agents Must Follow)
+
+1. **TypeScript everywhere** — no `any` types, strict mode enabled
+2. **Functional components** — no class components in React
+3. **Server Components by default** — only add "use client" when needed
+4. **Error boundaries** — wrap route segments with error.tsx
+5. **Loading states** — add loading.tsx for async routes
+6. **Environment variables** — never hardcode secrets, use `.env.local`
+7. **Imports** — use `@/` path alias for project imports
+8. **Naming** — PascalCase for components, camelCase for functions/variables, kebab-case for files
+
+## Obsidian Brain Protocol (MANDATORY for all agents)
+
+### Before Starting ANY Task
+1. Read `.swamr/brain/00-project/overview.md` for project context
+2. Read `.swamr/brain/00-project/architecture.md` for architecture decisions
+3. Read task output notes for any tasks this task depends on
+4. Check `.swamr/brain/03-build/issues/` for known issues in your area
+
+### After Completing ANY Task
+1. Write a task output note to `.swamr/brain/03-build/task-outputs/[task-id].md`
+   (Use the template at `.swamr/brain/templates/task-output.md`)
+2. Update `.swamr/brain/03-build/phase-log.md` with a one-line entry
+3. If you made an architecture decision, write an ADR to `.swamr/brain/01-planning/decisions/`
+4. If you found an issue, log it to `.swamr/brain/03-build/issues/`
+
+This is non-negotiable. The brain is how agents pass context to each other across phases without losing information.
+
+## Communication Protocol
+
+When an agent completes a task, it MUST:
+1. Write its task output note to the Obsidian brain (see above)
+2. List the files created or modified
+3. Describe what was implemented
+4. Note any assumptions made
+5. Flag any issues or concerns for the QA loop
+6. Update `.swamr/state.json` with task status
+
+## Handoff Format
+
+When passing work between agents, include:
+```markdown
+## Handoff: [From Agent] → [To Agent]
+**Task**: [What needs to be done]
+**Context**: [What was done before this, relevant decisions]
+**Files to Work With**: [Specific file paths]
+**Acceptance Criteria**: [How to know it's done]
+**Constraints**: [Any limitations or requirements]
+```
+
+## Git Conventions
+
+- Branch naming: `swamr/[phase]-[task-slug]` (e.g., `swamr/build-user-auth`)
+- Commit messages: `[phase] task-id: description` (e.g., `[build] B3: add user profile page`)
+- One commit per task completion
+- Never force push to main
+
+## Quality Baseline
+
+Every piece of code must:
+- Compile without errors (`npm run build`)
+- Pass the linter (`npm run lint`)
+- Not break existing tests (`npm test`)
+- Handle errors gracefully (no unhandled promise rejections)
+- Be accessible (semantic HTML, ARIA labels where needed)

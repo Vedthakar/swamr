@@ -1,0 +1,201 @@
+---
+description: "Swamr Obsidian Brain — persistent knowledge base that agents read from and write to across phases. Prevents context loss by maintaining architecture decisions, task outputs, learned patterns, and project knowledge in an Obsidian vault. Every agent MUST read relevant notes before starting and write a summary note when done."
+globs: ""
+alwaysApply: false
+---
+
+# 🧠 Swamr Obsidian Brain
+
+You manage the project's Obsidian vault — the persistent second brain that ensures no agent ever loses context, no matter how many phases or sessions the build spans.
+
+## Vault Location
+
+The Obsidian vault lives at `.swamr/brain/` inside the project directory. It is initialized by the orchestrator at project start and opened in Obsidian alongside Cursor.
+
+## Vault Structure
+
+```
+.swamr/brain/
+├── 00-project/
+│   ├── overview.md              # Project description, goals, constraints
+│   ├── tech-stack.md            # Chosen technologies and why
+│   ├── architecture.md          # System architecture decisions
+│   └── glossary.md              # Domain terms and definitions
+├── 01-planning/
+│   ├── requirements.md          # Full requirements breakdown
+│   ├── task-tree.md             # Master task list with dependencies
+│   ├── risk-register.md         # Known risks and mitigations
+│   └── decisions/
+│       └── ADR-001-auth.md      # Architecture Decision Records
+├── 02-foundation/
+│   ├── db-schema.md             # Database schema with explanations
+│   ├── api-design.md            # API route design and contracts
+│   ├── component-tree.md        # UI component hierarchy
+│   └── auth-flow.md             # Authentication flow documentation
+├── 03-build/
+│   ├── phase-log.md             # Running log of what was built per phase
+│   ├── task-outputs/
+│   │   ├── F1-scaffold.md       # What each task produced
+│   │   ├── B1-dashboard.md
+│   │   └── ...
+│   └── issues/
+│       ├── bug-001.md           # Issues found during build
+│       └── ...
+├── 04-testing/
+│   ├── test-plan.md             # Testing strategy
+│   ├── qa-results.md            # Aggregated QA results
+│   └── coverage-gaps.md         # Known gaps in test coverage
+├── 05-hardening/
+│   ├── security-audit.md        # Security findings
+│   ├── performance-report.md    # Performance benchmarks
+│   ├── a11y-report.md           # Accessibility audit
+│   └── legal-checklist.md       # Legal compliance status
+├── 06-launch/
+│   ├── deploy-runbook.md        # Deployment steps
+│   ├── post-launch-checklist.md # Post-launch verification
+│   └── handoff.md               # Final handoff documentation
+├── templates/
+│   ├── task-output.md           # Template for task completion notes
+│   ├── decision-record.md       # Template for ADRs
+│   └── phase-summary.md         # Template for phase summaries
+└── index.md                     # Vault homepage with links to everything
+```
+
+## Agent Protocol: READ Before Work, WRITE After Work
+
+### Before Starting Any Task
+
+Every agent MUST:
+1. Read `.swamr/brain/00-project/overview.md` for project context
+2. Read `.swamr/brain/00-project/architecture.md` for architecture decisions
+3. Read the relevant phase folder for current context
+4. Read any task-output notes for dependency tasks
+5. Check `.swamr/brain/03-build/issues/` for known issues in the area
+
+### After Completing Any Task
+
+Every agent MUST write a task output note:
+
+```markdown
+---
+task_id: [ID]
+agent: [agent-slug]
+phase: [phase number]
+status: completed
+date: [ISO date]
+files_changed:
+  - [list of files created/modified]
+---
+
+# Task: [Description]
+
+## What Was Built
+[1-3 sentence summary of what was implemented]
+
+## Key Decisions
+- [Decision 1]: [Why]
+- [Decision 2]: [Why]
+
+## Dependencies Created
+- [Other tasks/components now depend on this because...]
+
+## Context for Next Agent
+[What the next agent working in this area needs to know.
+Include any non-obvious patterns, workarounds, or gotchas.]
+
+## Files Reference
+| File | Purpose |
+|------|---------|
+| `src/app/dashboard/page.tsx` | Main dashboard page component |
+| `src/lib/api/users.ts` | User API client functions |
+
+## Open Questions
+- [Anything unresolved that a future agent should address]
+```
+
+### Phase Transitions
+
+When a phase completes, the orchestrator writes a phase summary:
+
+```markdown
+---
+phase: [number]
+name: [phase name]
+completed: [ISO date]
+tasks_completed: [count]
+tasks_failed: [count]
+---
+
+# Phase [N] Summary: [Name]
+
+## What Was Accomplished
+[Summary of the phase's work]
+
+## Architecture State
+[Current state of the codebase after this phase]
+
+## Carry-Forward Context
+[Critical information the next phase needs to know.
+This is the most important section — it's what prevents context loss.]
+
+## Known Issues
+- [Issue 1]
+- [Issue 2]
+
+## Metrics
+- Tasks completed: X/Y
+- QA pass rate: Z%
+- Files created: N
+- Lines of code: ~N
+```
+
+## How Context Flows Between Phases
+
+```
+Phase 1 (Planning)
+  └── Writes: architecture.md, task-tree.md, db-schema.md, api-design.md
+        │
+Phase 2 (Foundation)
+  ├── Reads: ↑ all planning docs
+  └── Writes: task outputs, phase-2-summary.md
+        │
+Phase 3 (Build)
+  ├── Reads: ↑ architecture + foundation outputs
+  ├── Each task reads: dependency task outputs
+  └── Writes: per-task outputs, issues, phase-3-summary.md
+        │
+Phase 4 (Hardening)
+  ├── Reads: ↑ all build outputs + issues
+  └── Writes: security/perf/a11y/legal reports
+        │
+Phase 5 (Launch)
+  ├── Reads: ↑ everything
+  └── Writes: deploy runbook, final handoff
+```
+
+## Obsidian-Specific Features
+
+### Wikilinks
+Use `[[wikilinks]]` to connect notes:
+- `[[architecture]]` — links to architecture decisions
+- `[[F1-scaffold]]` — links to a task output
+- `[[ADR-001-auth]]` — links to a decision record
+
+### Tags
+Use tags for quick filtering:
+- `#phase/1` through `#phase/6`
+- `#agent/frontend-developer`, `#agent/backend-architect`, etc.
+- `#status/completed`, `#status/blocked`, `#status/in-progress`
+- `#type/decision`, `#type/issue`, `#type/task-output`
+
+### Dataview Queries
+The index.md includes dataview queries for live dashboards:
+```dataview
+TABLE status, agent, date
+FROM "03-build/task-outputs"
+SORT date DESC
+```
+
+## Initialization
+
+When the orchestrator starts a new project, it creates the full vault structure and writes the initial notes. The user can then open `.swamr/brain/` as an Obsidian vault to watch progress in real-time as agents build.

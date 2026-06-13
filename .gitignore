@@ -1,0 +1,9 @@
+# Agency agents clone (downloaded during setup)
+.agency-agents/
+
+# Claude Code local settings
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db

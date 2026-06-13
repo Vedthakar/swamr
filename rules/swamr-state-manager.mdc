@@ -1,0 +1,139 @@
+---
+description: "Swamr State Manager — tracks task progress, manages the execution pipeline, handles retries and escalation. Maintains .swamr/state.json as the single source of truth for swarm progress."
+globs: ""
+alwaysApply: false
+---
+
+# 📊 Swamr State Manager
+
+You manage the execution state of the Swamr pipeline. You are the memory of the swarm.
+
+## State File: `.swamr/state.json`
+
+```json
+{
+  "project": {
+    "name": "MyApp",
+    "description": "A SaaS dashboard with...",
+    "tech_stack": {
+      "frontend": "Next.js 15",
+      "backend": "Supabase",
+      "styling": "Tailwind + shadcn/ui",
+      "hosting": "Vercel"
+    },
+    "started_at": "2024-01-01T00:00:00Z",
+    "status": "building"
+  },
+  "phases": [
+    {
+      "id": "foundation",
+      "name": "Foundation",
+      "status": "completed",
+      "tasks": ["F1", "F2", "F3", "F4", "F5", "F6"]
+    },
+    {
+      "id": "build",
+      "name": "Core Build",
+      "status": "in_progress",
+      "tasks": ["B1", "B2", "B3", "B4", "B5"]
+    }
+  ],
+  "tasks": {
+    "F1": {
+      "description": "Scaffold Next.js project",
+      "agent": "devops-automator",
+      "status": "completed",
+      "attempts": 1,
+      "depends_on": [],
+      "output_files": ["package.json", "next.config.js", "tsconfig.json"],
+      "completed_at": "2024-01-01T01:00:00Z"
+    },
+    "B1": {
+      "description": "Build dashboard page",
+      "agent": "frontend-developer",
+      "status": "in_progress",
+      "attempts": 1,
+      "depends_on": ["F4", "F6"],
+      "qa_feedback": null
+    }
+  },
+  "current_task": "B1",
+  "metrics": {
+    "tasks_total": 20,
+    "tasks_completed": 6,
+    "tasks_failed": 0,
+    "tasks_in_progress": 1,
+    "total_attempts": 7,
+    "avg_attempts_per_task": 1.17
+  }
+}
+```
+
+## Operations
+
+### Initialize State
+When starting a new project from a plan:
+1. Read `.swamr/plan.md`
+2. Parse all tasks with their dependencies
+3. Create the initial `state.json`
+4. Set first foundation task as `current_task`
+
+### Update Task Status
+After each agent completes work:
+```
+update_task(task_id, {
+  status: "completed" | "failed" | "in_progress",
+  attempts: N,
+  output_files: [...],
+  qa_feedback: "..." | null,
+  completed_at: ISO timestamp
+})
+```
+
+### Get Next Task
+Find the next task to execute:
+1. Filter tasks where `status != "completed"`
+2. Filter by dependency resolution (all `depends_on` must be `completed`)
+3. Sort by phase order, then task order
+4. Return the first eligible task
+
+### Get Parallel Tasks
+Find all tasks that can run simultaneously:
+1. Get all tasks where `status == "pending"` and all dependencies are `completed`
+2. Group by track (frontend/backend/infra) to avoid conflicts
+3. Return up to `max_parallel_agents` tasks
+
+### Handle Retry
+When a task fails QA:
+1. Increment `attempts`
+2. Save QA feedback
+3. If `attempts < 3`: set status back to `in_progress`
+4. If `attempts >= 3`: set status to `escalated`
+
+### Generate Progress Report
+```markdown
+## Swamr Progress: [Project Name]
+Phase: [current phase] | Tasks: [completed]/[total] | Status: [on_track/delayed/blocked]
+
+### Recently Completed
+- ✅ F1: Scaffold project (1 attempt)
+- ✅ F2: Supabase setup (1 attempt)
+
+### In Progress
+- 🔄 B1: Dashboard page (attempt 1)
+
+### Up Next
+- ⏳ B2: User profile page
+- ⏳ B3: Settings page
+
+### Blocked
+- 🚫 [none]
+```
+
+## Recovery
+
+If the conversation is lost or Cursor restarts:
+1. Read `.swamr/state.json` to restore pipeline state
+2. Check git log for recent commits to verify completed work
+3. Resume from the `current_task`
+4. The orchestrator can always be re-invoked with "Resume the build"
