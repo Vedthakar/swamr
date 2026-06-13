@@ -49,6 +49,7 @@ No context is lost between phases because every agent reads from and writes to t
 | Tool | Required? | Install |
 |------|-----------|---------|
 | **Cursor** | Yes | [cursor.com](https://cursor.com) (Pro recommended for unlimited usage) |
+| **Cursor CLI** | For multi-agent mode | Included with Cursor. Run `cursor agent login` to authenticate. |
 | **Obsidian** | Highly recommended | [obsidian.md](https://obsidian.md) (free) |
 | **Node.js 18+** | Yes | [nodejs.org](https://nodejs.org) |
 | **Git** | Yes | Comes with most OS installs |
@@ -61,82 +62,87 @@ No context is lost between phases because every agent reads from and writes to t
 ### 1. Install Swamr
 
 ```bash
-# Option A: Install globally (recommended)
-npm install -g swamr
+# Option A: Install directly from GitHub (recommended)
+npm install -g github:Vedthakar/swamr
 
-# Option B: Clone and link manually
+# Option B: Clone and link (if you want to modify Swamr itself)
 git clone https://github.com/Vedthakar/swamr.git ~/swamr
-cd ~/swamr && npm install && npm run build && npm link
+cd ~/swamr
+npm install
+npm run build
+npm link
 ```
+
+After install, verify it works:
+
+```bash
+swamr --help
+```
+
+You should see the Swamr help menu with `init` and `build` commands.
 
 ### 2. Initialize in Your Project
 
 ```bash
-# Initialize in current directory
-swamr init
-
-# Or create a new project
+# Create a new project and initialize Swamr in it
 swamr init ./my-new-app
 
-# Or use npx without installing globally
-npx swamr init ./my-new-app
+# Or initialize in an existing project directory
+cd ./my-existing-app
+swamr init
 ```
 
-This does everything:
+This does everything automatically:
 - Clones 150+ agent skills from [agency-agents](https://github.com/msitarzewski/agency-agents)
 - Converts them to Cursor `.mdc` rule files
 - Installs the orchestrator, planner, QA loop, and brain system
 - Creates the Obsidian vault structure with templates
 - Sets up git and gitignore
 
-### 3. Open in Cursor + Obsidian
+### 3. Open the Brain in Obsidian (optional but recommended)
 
 ```bash
-# Open the project in Cursor
-cursor ~/my-new-app
-
-# Open the brain vault in Obsidian
-# File → Open Vault → ~/my-new-app/swamr/brain/
+# In Obsidian: File → Open Vault → select ~/my-new-app/swamr/brain/
 ```
 
-### 4. Switch Cursor to Agent Mode — REQUIRED
+Watch the vault fill up with architecture decisions, task outputs, and progress notes as agents work.
 
-> **This is the most important step.** Swamr only works in **Agent mode**. Regular chat just writes text — it can't read files, run commands, or build anything.
+### 4. Build Something
 
-In Cursor's chat panel:
+You have two options:
 
-1. Click the **`∞ Agent`** button in the bottom-left of the chat input (it will show a dropdown — select **Agent**)
-2. Leave the model on **Auto** (or pick claude-opus for best results on complex builds)
-3. Do **not** use Plan Mode (⇧ Tab) — that pauses for approval before every action and will slow the swarm to a crawl
+#### Option A: CLI Multi-Agent Mode (recommended for big projects)
 
-![Cursor Agent Mode](https://i.imgur.com/placeholder.png)
+This spawns **real parallel agent processes** — multiple agents working simultaneously.
 
-Agent mode gives Cursor the ability to:
-- Read and write files in your project
-- Run terminal commands (`npm install`, `npx`, etc.)
-- Execute multiple steps in sequence without stopping
-- Retry and self-correct when something fails
+```bash
+# Authenticate cursor CLI first (one-time setup)
+cursor agent login
 
-Without Agent mode, the `@swamr-orchestrator` prompt will just describe what it would do instead of actually doing it.
+# Build your project
+swamr build --dir ./my-new-app "A project management tool with kanban boards and real-time updates"
+```
 
-### 5. Build Something
+You can also plan first and review before executing:
 
-With Agent mode active, type your prompt and hit send:
+```bash
+swamr build --dir ./my-new-app --plan-only "Your app description"
+# Review swamr/plan.md and swamr/tasks.json, then:
+swamr build --dir ./my-new-app --resume
+```
+
+#### Option B: Single-Agent Mode (simpler, runs inside Cursor chat)
+
+1. Open the project in Cursor: `cursor ~/my-new-app`
+2. In the chat panel, click the mode dropdown and select **Agent** (not Chat, not Plan Mode)
+3. Type your prompt:
 
 ```
 @swamr-orchestrator Build me a project management tool with kanban boards, 
 team collaboration, real-time updates, and Supabase backend.
 ```
 
-Watch the Obsidian vault fill up with architecture decisions, task outputs, and progress notes as the agents work.
-
-#### Quick reference: Cursor modes explained
-
-| Mode | What it does | Use for Swamr? |
-|------|-------------|----------------|
-| **∞ Agent** | Reads/writes files, runs commands, acts autonomously | ✅ YES — always use this |
-| Chat | Responds with text only, no file access | ❌ No |
-| Plan Mode (⇧ Tab) | Pauses before every action for approval | ⚠️ Only if you want step-by-step control |
+> **Important:** Single-agent mode only works in **Agent mode** (the `∞ Agent` option in Cursor's chat dropdown). Regular Chat mode just writes text — it can't read files or run commands. Plan Mode pauses for approval before every action, which slows the swarm to a crawl.
 
 ---
 
@@ -375,11 +381,13 @@ If you have MCP servers configured in Cursor, the agents use them automatically:
 ## Updating
 
 ```bash
-# If installed globally
-npm update -g swamr
+# If installed from GitHub
+npm install -g github:Vedthakar/swamr
 
 # If cloned locally
-cd ~/swamr && git pull && npm run build
+cd ~/swamr
+git pull
+npm run build
 
 # Then re-init any project to get the latest agents
 swamr init ~/path/to/your/project
