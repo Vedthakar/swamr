@@ -134,7 +134,7 @@ If you are blocked on a human-only step:
 2. Stop and end your turn. The orchestrator marks the task `blocked` (not failed — it is NOT
    retried), keeps other tasks running, and surfaces a batched "🙋 NEEDS YOU" list to the user
    plus `swamr/NEEDS-YOU.md`. Once the user resolves it and deletes the blocker file, `swamr
-   build --resume` requeues the task.
+   continue` requeues the task.
 
 Before the swarm starts, the orchestrator runs an MCP preflight (`cursor agent mcp list`). If a
 required MCP server is `not loaded (needs approval)` / not authenticated, it stops and tells the

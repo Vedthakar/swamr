@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { init } from "./init.js";
-import { build } from "./build.js";
+import { build, continueBuild } from "./build.js";
 
 const VERSION = "1.2.0";
 
@@ -12,6 +12,7 @@ swamr v${VERSION} — Agent swarm for Cursor
 Usage:
   swamr init [project-dir]              Set up Swamr in a project
   swamr build [options] "description"   Build a project with the agent swarm
+  swamr continue [options]              Continue a previous Swamr build
   swamr --version                       Show version
   swamr --help                          Show this help
 
@@ -31,12 +32,21 @@ Commands:
       --trust            Auto-approve all agent commands (skip approval prompts)
                          Without this flag, agents will ask before running commands.
 
+  continue [options]
+                    Resume from swamr/state.json without re-planning.
+                    Requeues failed/skipped tasks and continues from saved state.
+
+    Options:
+      --dir <path>       Project directory (default: current dir)
+      --model <model>    Model for worker agents (default: sonnet-4)
+      --trust            Auto-approve all agent commands (skip approval prompts)
+
 Examples:
   swamr init ./my-app
   swamr build "A SaaS dashboard with auth, billing, and team management"
   swamr build --trust "A SaaS dashboard with auth, billing, and team management"
   swamr build --dir ./my-app --plan-only "Recipe sharing app with social features"
-  swamr build --resume --dir ./my-app
+  swamr continue --dir ./my-app
 `);
 }
 
@@ -105,6 +115,30 @@ async function main() {
         plan_only: planOnly,
         trust,
       });
+      break;
+    }
+
+    case "continue": {
+      const continueArgs = args.slice(1);
+      let dir = ".";
+      let model: string | undefined;
+      let trust = false;
+
+      for (let i = 0; i < continueArgs.length; i++) {
+        switch (continueArgs[i]) {
+          case "--dir":
+            dir = continueArgs[++i];
+            break;
+          case "--model":
+            model = continueArgs[++i];
+            break;
+          case "--trust":
+            trust = true;
+            break;
+        }
+      }
+
+      await continueBuild(dir, { model, trust });
       break;
     }
 

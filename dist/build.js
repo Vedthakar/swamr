@@ -9,6 +9,15 @@ const MANUAL_STEP_PATTERNS = [
     /needs approval/i,
     /not authenticated/i,
     /requires? (?:an? )?api[ _-]?key/i,
+    /supabase/i,
+    /create (?:a )?(?:new )?project/i,
+    /\bdashboard\b/i,
+    /sign ?up/i,
+    /create an account/i,
+    /\bcredentials?\b/i,
+    /\bbilling\b/i,
+    /\bbrowser\b/i,
+    /cannot .*headless/i,
     /\bmcp\b[^.\n]*\b(login|auth)/i,
     /please (?:authenticate|log ?in|sign ?in|approve)/i,
     /awaiting (?:user|human|manual)/i,
@@ -43,7 +52,7 @@ function saveState(projectDir, state) {
 // Headless `cursor agent --print` cannot complete an interactive MCP auth/approval
 // in the Cursor GUI — it just silently waits until timeout (the F2 Supabase hang).
 // Detect that BEFORE spawning the swarm and tell the user exactly what to do.
-const MCP_NOT_READY = /not loaded|needs approval|not authenticated|unauthor|error/i;
+const MCP_NOT_READY = /not authenticated|unauthor/i;
 function preflightMcp(projectDir, config) {
     const out = runSafe("cursor agent mcp list", projectDir);
     // If we can't determine status, don't block the build.
@@ -99,7 +108,7 @@ function detectManualStep(output, task) {
         steps: [
             "If an MCP server needs auth, run: cursor agent mcp login <server>",
             "If an API key/secret is needed, add it to .env.local",
-            "Then re-run: swamr build --resume",
+            "Then re-run: swamr continue",
         ],
     };
 }
@@ -127,7 +136,7 @@ ${b.why ? `\n**Why:** ${b.why}\n` : ""}${steps ? `\n**How to resolve:**\n${steps
         .join("\n");
     writeFileDeep(fp, `# 🙋 Swamr needs you
 
-These tasks are paused waiting on a manual step only you can do. Resolve them, then run \`swamr build --resume\`.
+These tasks are paused waiting on a manual step only you can do. Resolve them, then run \`swamr continue\`.
 
 ${body}
 `);
@@ -143,7 +152,48 @@ function printNeedsYou(blockers) {
             console.log(`     • ${s}`);
     }
     console.log(`\n  Details written to swamr/NEEDS-YOU.md`);
-    console.log(`  After resolving, run: swamr build --resume\n`);
+    console.log(`  After resolving, run: swamr continue\n`);
+}
+function findBlockingDeps(task, state, seen = new Set()) {
+    const blockers = new Set();
+    for (const dep of task.depends_on) {
+        if (seen.has(dep))
+            continue;
+        seen.add(dep);
+        const depTask = state.tasks.find((t) => t.id === dep);
+        if (!depTask)
+            continue;
+        if (depTask.status === "failed" || depTask.status === "blocked" || depTask.status === "skipped") {
+            blockers.add(depTask.id);
+            for (const nested of depTask.blocked_by ?? [])
+                blockers.add(nested);
+            continue;
+        }
+        for (const nested of findBlockingDeps(depTask, state, seen))
+            blockers.add(nested);
+    }
+    return [...blockers];
+}
+function markUnreachable(projectDir, tasks, state) {
+    let skipped = 0;
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const task of tasks) {
+            if (task.status !== "pending")
+                continue;
+            const blockers = findBlockingDeps(task, state);
+            if (blockers.length === 0)
+                continue;
+            task.status = "skipped";
+            task.blocked_by = blockers;
+            skipped++;
+            changed = true;
+        }
+    }
+    if (skipped > 0)
+        saveState(projectDir, state);
+    return skipped;
 }
 function buildBrainContext(projectDir) {
     const brainDir = path.join(projectDir, "swamr", "brain");
@@ -217,9 +267,9 @@ async function runTaskBatch(projectDir, tasks, state, config, model, trust = fal
     phase: "build",
 }) {
     let brainContext = buildBrainContext(projectDir);
-    // pending = anything still actionable. Blocked tasks are intentionally excluded
-    // (they wait on a human) so we never burn retries on them.
-    let pending = tasks.filter((t) => t.status === "pending" || t.status === "failed");
+    // pending = anything still actionable. Failed, blocked, and skipped tasks are
+    // terminal for this run unless `swamr continue` requeues them.
+    let pending = tasks.filter((t) => t.status === "pending");
     let wave = 0;
     while (pending.length > 0) {
         const ready = pending.filter((t) => t.depends_on.every((dep) => {
@@ -227,13 +277,12 @@ async function runTaskBatch(projectDir, tasks, state, config, model, trust = fal
             return depTask?.status === "completed";
         }));
         if (ready.length === 0) {
-            // Nothing can run: either a real deadlock or everything left is blocked on a human.
-            const blockedDeps = pending.filter((t) => t.depends_on.some((dep) => {
-                const depTask = state.tasks.find((st) => st.id === dep);
-                return depTask?.status === "blocked";
-            }));
-            if (blockedDeps.length > 0) {
-                warn(`${blockedDeps.length} task(s) waiting on blocked dependencies — see swamr/NEEDS-YOU.md`);
+            // Nothing can run: either a real dependency cycle or remaining tasks are
+            // unreachable because an upstream task failed/blocked/skipped.
+            const skipped = markUnreachable(projectDir, pending, state);
+            if (skipped > 0) {
+                pending = pending.filter((t) => t.status === "pending");
+                warn(`${skipped} task(s) skipped because dependencies are failed or blocked`);
             }
             else {
                 warn("No tasks ready — possible dependency deadlock");
@@ -309,8 +358,8 @@ ${result.output.slice(-2000)}
         writeNeedsYou(projectDir, blockers);
         if (dashboard)
             dashboard.blockedCount = blockers.length;
-        // Remove tasks that are done for this run (completed/failed/blocked) from pending.
-        pending = pending.filter((t) => t.status === "pending" || t.status === "failed");
+        // Remove tasks that are done for this run from pending.
+        pending = pending.filter((t) => t.status === "pending");
         // Re-evaluation checkpoint between waves: a single agent assesses progress,
         // flags stuck/duplicate work, and may split large tasks into subtasks.
         if (opts.runCheckpoint && pending.length > 0) {
@@ -408,8 +457,9 @@ RULES:
 
 MANUAL-STEP / BLOCKER PROTOCOL (IMPORTANT):
 If you cannot finish because of something only a human can do — authenticating an MCP server,
-providing an API key or secret, creating or upgrading an account, billing, or clicking through a
-web GUI — do NOT keep retrying, wait, or fake the result. Instead:
+creating a Supabase/Google Cloud/other hosted project, providing an API key or secret, creating
+or upgrading an account, billing, or clicking through a web GUI/dashboard — do NOT keep retrying,
+wait, or fake the result. This is especially important for setup/infrastructure tasks. Instead:
 1. Write the file swamr/blockers/${task.id}.json with EXACTLY this JSON shape:
    {
      "task_id": "${task.id}",
@@ -424,6 +474,104 @@ web GUI — do NOT keep retrying, wait, or fake the result. Instead:
 ${task.attempts > 1 ? `\nNOTE: This is retry attempt ${task.attempts}. Previous attempt failed. Make sure to check for existing files before creating new ones, and fix any issues from the previous attempt.\n` : ""}
 
 Begin working now. Complete the task fully.`;
+}
+async function executeBuild(projectDir, state, config, workerModel, trust) {
+    // --- PHASE 2+: EXECUTE TASKS BY PHASE ---
+    const phases = ["foundation", "build", "testing", "hardening", "launch"];
+    const totalTasks = state.tasks.length;
+    const alreadyDone = state.tasks.filter((t) => t.status === "completed").length;
+    const dashboard = new ProgressDashboard();
+    dashboard.totalPhases = phases.filter((p) => state.tasks.some((t) => t.phase === p)).length;
+    dashboard.overallTotal = totalTasks;
+    dashboard.overallCompleted = alreadyDone;
+    dashboard.start();
+    let phaseCounter = 0;
+    for (const phase of phases) {
+        const phaseTasks = state.tasks.filter((t) => t.phase === phase);
+        if (phaseTasks.length === 0)
+            continue;
+        const allDone = phaseTasks.every((t) => t.status === "completed");
+        if (allDone)
+            continue;
+        phaseCounter++;
+        state.current_phase = phase;
+        dashboard.phase = phase;
+        dashboard.phaseIndex = phaseCounter;
+        dashboard.phaseCompleted = phaseTasks.filter((t) => t.status === "completed").length;
+        dashboard.phaseTotal = phaseTasks.length;
+        dashboard.activeTasks = [];
+        // Verification phases run smaller waves and always check between them.
+        const verify = VERIFY_PHASES.has(phase);
+        const waveSize = verify ? config.verify_wave_size : config.wave_size;
+        const runCheckpoint = verify ? true : config.checkpoint_between_waves;
+        await runTaskBatch(projectDir, phaseTasks, state, config, workerModel, trust, dashboard, {
+            waveSize,
+            runCheckpoint,
+            phase,
+        });
+        // Write phase summary to brain
+        const completed = phaseTasks.filter((t) => t.status === "completed").length;
+        const failed = phaseTasks.filter((t) => t.status === "failed").length;
+        const skipped = phaseTasks.filter((t) => t.status === "skipped").length;
+        writeFileDeep(path.join(projectDir, "swamr", "brain", `0${phases.indexOf(phase) + 2}-${phase}`, "phase-summary.md"), `---
+phase: ${phase}
+completed: ${new Date().toISOString()}
+tasks_completed: ${completed}
+tasks_failed: ${failed}
+tasks_skipped: ${skipped}
+---
+
+# Phase Summary: ${phase}
+
+## Results
+- Tasks completed: ${completed}/${phaseTasks.length}
+- Tasks failed: ${failed}/${phaseTasks.length}
+- Tasks skipped: ${skipped}/${phaseTasks.length}
+
+## Completed Tasks
+${phaseTasks
+            .filter((t) => t.status === "completed")
+            .map((t) => `- ${t.id}: ${t.description}`)
+            .join("\n")}
+
+${failed > 0 ? `## Failed Tasks\n${phaseTasks.filter((t) => t.status === "failed").map((t) => `- ${t.id}: ${t.description}`).join("\n")}` : ""}
+${skipped > 0 ? `## Skipped Tasks\n${phaseTasks.filter((t) => t.status === "skipped").map((t) => `- ${t.id}: ${t.description}${t.blocked_by?.length ? ` (blocked by ${t.blocked_by.join(", ")})` : ""}`).join("\n")}` : ""}
+`);
+        saveState(projectDir, state);
+        if (failed > 0 || skipped > 0) {
+            dashboard.stop();
+            if (failed > 0)
+                warn(`Phase "${phase}" had ${failed} failed tasks`);
+            if (skipped > 0)
+                warn(`Phase "${phase}" skipped ${skipped} task(s) due to failed or blocked dependencies`);
+            dashboard.start();
+        }
+    }
+    dashboard.stop();
+    // --- DONE ---
+    const totalCompleted = state.tasks.filter((t) => t.status === "completed").length;
+    const totalFailed = state.tasks.filter((t) => t.status === "failed").length;
+    const totalSkipped = state.tasks.filter((t) => t.status === "skipped").length;
+    const blockers = collectBlockers(projectDir, state);
+    writeNeedsYou(projectDir, blockers);
+    state.status =
+        blockers.length > 0
+            ? "blocked"
+            : totalFailed === 0 && totalSkipped === 0
+                ? "completed"
+                : "completed_with_errors";
+    saveState(projectDir, state);
+    console.log();
+    header("🐝 Swamr Build Complete!");
+    console.log();
+    console.log(`  Tasks completed: ${totalCompleted}/${state.tasks.length}`);
+    console.log(`  Tasks failed:    ${totalFailed}`);
+    console.log(`  Tasks skipped:   ${totalSkipped}`);
+    console.log(`  Tasks blocked:   ${blockers.length}`);
+    console.log(`  Brain notes:     swamr/brain/`);
+    console.log(`  State:           swamr/state.json`);
+    console.log();
+    printNeedsYou(blockers);
 }
 export async function build(targetDir, description, options = {}) {
     const projectDir = path.resolve(targetDir);
@@ -456,7 +604,7 @@ export async function build(targetDir, description, options = {}) {
         }
         console.log("  (or open Cursor → Settings → MCP and approve/authenticate it)");
         console.log();
-        console.log(`  Then re-run:  ${bold("swamr build --resume")}`);
+        console.log(`  Then re-run:  ${bold("swamr continue")}`);
         console.log();
         process.exit(1);
     }
@@ -583,97 +731,131 @@ each wave is wide. Create 40-80 tasks; more is better as long as each is genuine
         info(`Plan created with ${tasks.length} tasks`);
         if (options.plan_only) {
             header("✅ Plan created. Review swamr/plan.md and swamr/tasks.json");
-            console.log("Run 'swamr build --resume' to execute the plan.");
+            console.log("Run 'swamr continue' to execute the plan.");
             return;
         }
     }
-    // --- PHASE 2+: EXECUTE TASKS BY PHASE ---
-    const phases = ["foundation", "build", "testing", "hardening", "launch"];
-    const totalTasks = state.tasks.length;
-    const alreadyDone = state.tasks.filter((t) => t.status === "completed").length;
-    const dashboard = new ProgressDashboard();
-    dashboard.totalPhases = phases.filter((p) => state.tasks.some((t) => t.phase === p)).length;
-    dashboard.overallTotal = totalTasks;
-    dashboard.overallCompleted = alreadyDone;
-    dashboard.start();
-    let phaseCounter = 0;
-    for (const phase of phases) {
-        const phaseTasks = state.tasks.filter((t) => t.phase === phase);
-        if (phaseTasks.length === 0)
-            continue;
-        const allDone = phaseTasks.every((t) => t.status === "completed");
-        if (allDone) {
-            dashboard.overallCompleted += phaseTasks.length;
-            continue;
-        }
-        phaseCounter++;
-        state.current_phase = phase;
-        dashboard.phase = phase;
-        dashboard.phaseIndex = phaseCounter;
-        dashboard.phaseCompleted = phaseTasks.filter((t) => t.status === "completed").length;
-        dashboard.phaseTotal = phaseTasks.length;
-        dashboard.activeTasks = [];
-        // Verification phases run smaller waves and always check between them.
-        const verify = VERIFY_PHASES.has(phase);
-        const waveSize = verify ? config.verify_wave_size : config.wave_size;
-        const runCheckpoint = verify ? true : config.checkpoint_between_waves;
-        await runTaskBatch(projectDir, phaseTasks, state, config, workerModel, trust, dashboard, {
-            waveSize,
-            runCheckpoint,
-            phase,
-        });
-        // Write phase summary to brain
-        const completed = phaseTasks.filter((t) => t.status === "completed").length;
-        const failed = phaseTasks.filter((t) => t.status === "failed").length;
-        writeFileDeep(path.join(projectDir, "swamr", "brain", `0${phases.indexOf(phase) + 2}-${phase}`, "phase-summary.md"), `---
-phase: ${phase}
-completed: ${new Date().toISOString()}
-tasks_completed: ${completed}
-tasks_failed: ${failed}
----
-
-# Phase Summary: ${phase}
-
-## Results
-- Tasks completed: ${completed}/${phaseTasks.length}
-- Tasks failed: ${failed}/${phaseTasks.length}
-
-## Completed Tasks
-${phaseTasks
-            .filter((t) => t.status === "completed")
-            .map((t) => `- ${t.id}: ${t.description}`)
-            .join("\n")}
-
-${failed > 0 ? `## Failed Tasks\n${phaseTasks.filter((t) => t.status === "failed").map((t) => `- ${t.id}: ${t.description}`).join("\n")}` : ""}
-`);
-        saveState(projectDir, state);
-        if (failed > 0) {
-            dashboard.stop();
-            warn(`Phase "${phase}" had ${failed} failed tasks`);
-            dashboard.start();
+    await executeBuild(projectDir, state, config, workerModel, trust);
+}
+function printResumeSummary(projectDir, state) {
+    const counts = {
+        completed: state.tasks.filter((t) => t.status === "completed").length,
+        pending: state.tasks.filter((t) => t.status === "pending").length,
+        failed: state.tasks.filter((t) => t.status === "failed").length,
+        skipped: state.tasks.filter((t) => t.status === "skipped").length,
+        blocked: state.tasks.filter((t) => t.status === "blocked").length,
+        inProgress: state.tasks.filter((t) => t.status === "in_progress").length,
+    };
+    header("Resume summary");
+    console.log(`  Current phase: ${state.current_phase}`);
+    console.log(`  Completed:     ${counts.completed}/${state.tasks.length}`);
+    console.log(`  Pending:       ${counts.pending}`);
+    console.log(`  Failed:        ${counts.failed}`);
+    console.log(`  Skipped:       ${counts.skipped}`);
+    console.log(`  Blocked:       ${counts.blocked}`);
+    if (counts.inProgress > 0)
+        console.log(`  In progress:   ${counts.inProgress} (will be requeued)`);
+    const blockers = collectBlockers(projectDir, state);
+    if (blockers.length > 0) {
+        console.log();
+        console.log("  Needs you:");
+        for (const blocker of blockers) {
+            console.log(`    • [${blocker.task_id}] ${blocker.what_i_need}`);
         }
     }
-    dashboard.stop();
-    // --- DONE ---
-    const totalCompleted = state.tasks.filter((t) => t.status === "completed").length;
-    const totalFailed = state.tasks.filter((t) => t.status === "failed").length;
-    const blockers = collectBlockers(projectDir, state);
-    writeNeedsYou(projectDir, blockers);
-    state.status =
-        blockers.length > 0
-            ? "blocked"
-            : totalFailed === 0
-                ? "completed"
-                : "completed_with_errors";
+    const dependencySkips = state.tasks.filter((t) => t.status === "skipped" && t.blocked_by?.length);
+    if (dependencySkips.length > 0) {
+        console.log();
+        console.log("  Dependency skips:");
+        for (const task of dependencySkips.slice(0, 10)) {
+            console.log(`    • [${task.id}] blocked by ${task.blocked_by.join(", ")}`);
+        }
+        if (dependencySkips.length > 10) {
+            console.log(`    • ...and ${dependencySkips.length - 10} more`);
+        }
+    }
+    console.log();
+}
+function recheckBlockers(projectDir, state) {
+    let cleared = 0;
+    for (const task of state.tasks) {
+        if (task.status === "blocked" && !readBlocker(projectDir, task.id)) {
+            task.status = "pending";
+            task.blocked_by = undefined;
+            cleared++;
+        }
+    }
+    return cleared;
+}
+function requeueRecoverableTasks(state) {
+    let requeued = 0;
+    for (const task of state.tasks) {
+        if (task.status === "failed" || task.status === "skipped" || task.status === "in_progress") {
+            task.status = "pending";
+            task.attempts = 0;
+            task.blocked_by = undefined;
+            requeued++;
+        }
+    }
+    return requeued;
+}
+export async function continueBuild(targetDir, options = {}) {
+    const projectDir = path.resolve(targetDir);
+    const config = loadConfig(projectDir);
+    const workerModel = options.model ?? "sonnet-4";
+    const trust = options.trust ?? false;
+    const cursorCheck = runSafe("cursor agent --version");
+    if (!cursorCheck) {
+        console.error("\n❌ cursor agent CLI not found or not authenticated.");
+        console.error("Run: cursor agent login");
+        console.error("Then try again.\n");
+        process.exit(1);
+    }
+    const state = loadState(projectDir);
+    if (!state) {
+        console.error("\n❌ No previous Swamr build found.");
+        console.error("Run: swamr build --dir <project-dir> \"Your app description\"");
+        console.error("Then use: swamr continue --dir <project-dir>\n");
+        process.exit(1);
+    }
+    header("🐝 Swamr — Continue Build");
+    console.log(`  Project:    ${projectDir}`);
+    console.log(`  Workers:    up to ${config.max_parallel_agents} parallel agents`);
+    console.log(`  Workers:    ${workerModel}`);
+    console.log(`  Trust mode: ${trust ? "ON (auto-approve all commands)" : "OFF (agents will ask before running commands)"}`);
+    console.log();
+    printResumeSummary(projectDir, state);
+    const cleared = recheckBlockers(projectDir, state);
+    if (cleared > 0) {
+        info(`${cleared} resolved blocker(s) requeued`);
+    }
+    const requeued = requeueRecoverableTasks(state);
+    if (requeued > 0) {
+        info(`${requeued} failed/skipped/in-progress task(s) requeued`);
+    }
+    const stillBlocked = collectBlockers(projectDir, state);
+    writeNeedsYou(projectDir, stillBlocked);
+    if (stillBlocked.length > 0)
+        printNeedsYou(stillBlocked);
     saveState(projectDir, state);
-    console.log();
-    header("🐝 Swamr Build Complete!");
-    console.log();
-    console.log(`  Tasks completed: ${totalCompleted}/${state.tasks.length}`);
-    console.log(`  Tasks failed:    ${totalFailed}`);
-    console.log(`  Tasks blocked:   ${blockers.length}`);
-    console.log(`  Brain notes:     swamr/brain/`);
-    console.log(`  State:           swamr/state.json`);
-    console.log();
-    printNeedsYou(blockers);
+    const pre = preflightMcp(projectDir, config);
+    if (!pre.ok) {
+        header("🙋 Manual step needed before the swarm can continue");
+        console.log();
+        console.log("  These MCP servers aren't ready — agents would hang waiting on them:");
+        for (const server of pre.notReady) {
+            console.log(`    • ${bold(server.name)} — ${server.status}`);
+        }
+        console.log();
+        console.log("  To fix, authenticate/approve each one:");
+        for (const server of pre.notReady) {
+            console.log(`    cursor agent mcp login ${server.name}`);
+        }
+        console.log("  (or open Cursor → Settings → MCP and approve/authenticate it)");
+        console.log();
+        console.log(`  Then re-run:  ${bold("swamr continue")}`);
+        console.log();
+        process.exit(1);
+    }
+    await executeBuild(projectDir, state, config, workerModel, trust);
 }
