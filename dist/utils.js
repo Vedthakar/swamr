@@ -19,16 +19,18 @@ export function header(msg) {
 export function bold(msg) {
     return `${BOLD}${msg}${RESET}`;
 }
-export function run(cmd, cwd) {
+export function run(cmd, cwd, timeoutMs) {
     return execSync(cmd, {
         cwd,
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
+        timeout: timeoutMs,
+        maxBuffer: 1024 * 1024 * 32,
     }).trim();
 }
-export function runSafe(cmd, cwd) {
+export function runSafe(cmd, cwd, timeoutMs) {
     try {
-        return run(cmd, cwd);
+        return run(cmd, cwd, timeoutMs);
     }
     catch {
         return null;
@@ -104,9 +106,12 @@ function truncate(text, maxLen) {
     return text.length > maxLen ? text.slice(0, maxLen - 1) + "…" : text;
 }
 function progressBar(filled, total, width) {
-    const pct = total > 0 ? filled / total : 0;
-    const blocks = Math.round(pct * width);
-    return "█".repeat(blocks) + "░".repeat(width - blocks);
+    const safeWidth = Math.max(0, width);
+    const pct = total > 0 ? Math.min(1, Math.max(0, filled / total)) : 0;
+    // Clamp to [0, safeWidth] so String.repeat never receives a negative count
+    // (the dashboard crash when completed temporarily exceeds total after splits).
+    const blocks = Math.min(safeWidth, Math.max(0, Math.round(pct * safeWidth)));
+    return "█".repeat(blocks) + "░".repeat(safeWidth - blocks);
 }
 export class Spinner {
     interval = null;
@@ -195,7 +200,9 @@ export class ProgressDashboard {
             ? Math.round((this.phaseCompleted / this.phaseTotal) * 100)
             : 0;
         const phaseBar = progressBar(this.phaseCompleted, this.phaseTotal, barWidth);
-        const waveTag = this.wave > 0 ? `  wave ${this.wave}${this.checkpoint ? " · checkpoint" : ""}` : "";
+        const waveTag = this.wave > 0
+            ? `  ${this.phase || "phase"} wave ${this.wave}${this.checkpoint ? " · checkpoint" : ""}`
+            : "";
         const phaseLabel = `${CYAN}[${phaseBar}]${RESET} ${String(phasePct).padStart(3)}%  phase ${this.phaseIndex}/${this.totalPhases}: ${this.phase.toUpperCase()} ${this.phaseCompleted}/${this.phaseTotal}${waveTag}`;
         lines.push(truncate(phaseLabel, w));
         // ── Row 3: quip / checkpoint ────────────────────────────────────────────

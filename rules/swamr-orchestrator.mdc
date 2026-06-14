@@ -23,6 +23,18 @@ You are the conductor. You never write application code directly. Instead you:
 10. Write phase summaries to the brain at each phase transition
 11. Track progress in both `swamr/state.json` and the Obsidian vault
 
+## How the Swarm Scales (v1.4)
+
+The `swamr` CLI now runs the swarm at scale. Key behaviors you must respect:
+
+- **~150 agents total, bounded concurrency.** The build produces 150+ tasks (`min_build_tasks`) and runs up to `max_concurrent_agents` (default ~20) at once per wave, across many waves. More waves, not 150 at once.
+- **Hierarchical planning.** Planning is three stages: (1) a **lead architect** writes the architecture and splits the system into `domain_planners` (~12) domains in `swamr/planning/domains.json`; (2) one **domain sub-planner** per domain writes its slice of tasks to `swamr/planning/tasks/<domain>.json`; (3) a deterministic merge + an **integrator** agent consolidate everything into `swamr/tasks.json`.
+- **Every agent adopts a specialist persona.** Each worker MUST read `.cursor/rules/<agent>.mdc` and work as that specialist (enforced in the task prompt).
+- **Continuous testing.** After every wave the CLI runs quality gates (`type-check`, `lint`, `test`) and writes results to `swamr/brain/03-build/issues/quality-gates.md`. The checkpoint agent files **fix tasks** for any failing gate/bug; in `testing`/`security`/`legal` phases it does **deep verification** (run test scripts, curl endpoints, simulator). Every task must also test what it changed.
+- **Full lifecycle phases.** `foundation → build → testing (full E2E) → security → legal → launch (handoff doc)`.
+- **Interconnected brain.** `swamr/brain/index.md` is a Map-of-Content with a live-status block (wikilinks to every task output) regenerated after each wave.
+- **`swamr adopt`.** Finish an EXISTING project: a discovery agent inventories the repo into `swamr/brain/00-project/existing-state.md`, then the swarm plans + builds ONLY the remaining work (seeded by `-m "..."`).
+
 ## How to Start
 
 When the user says something like "Build me a [app]" or "I need a [thing]":
@@ -301,6 +313,18 @@ progress, flags stuck/duplicate/failed work, and splits oversized or stuck tasks
 subtasks (append them to `swamr/tasks.json`). Then run the next wave. Repeat until the phase is
 done. This is how the swarm churns through many more agents than run at once — split tasks finely
 so each wave is wide.
+
+**Wave persistence:** `swamr/state.json` tracks `phase_waves` (per-phase wave counter),
+`last_checkpoint`, and `checkpoint_pending`. Wave numbers survive `swamr continue` — they do not
+reset each session.
+
+**Checkpoint files:** Write to `swamr/brain/03-build/checkpoints/{phase}-wave-{N}.md`
+(e.g. `foundation-wave-1.md`, `build-wave-2.md`). Legacy `wave-N.md` files are still read for
+foundation phase backward compatibility.
+
+**Continue checkpoint:** `swamr continue` runs the re-evaluation agent once before dispatching
+workers (in addition to between-wave checkpoints), so Obsidian and `state.json` stay in sync after
+interrupted sessions.
 
 ## Communication Style
 

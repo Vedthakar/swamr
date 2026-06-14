@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { init } from "./init.js";
-import { build, continueBuild } from "./build.js";
-const VERSION = "1.2.0";
+import { build, continueBuild, adoptBuild } from "./build.js";
+const VERSION = "1.4.0";
 function printUsage() {
     console.log(`
 swamr v${VERSION} — Agent swarm for Cursor
@@ -10,6 +10,7 @@ Usage:
   swamr init [project-dir]              Set up Swamr in a project
   swamr build [options] "description"   Build a project with the agent swarm
   swamr continue [options]              Continue a previous Swamr build
+  swamr adopt [options] -m "..."        Finish an EXISTING project from where it is
   swamr --version                       Show version
   swamr --help                          Show this help
 
@@ -37,6 +38,22 @@ Commands:
       --dir <path>       Project directory (default: current dir)
       --model <model>    Model for worker agents (default: auto)
       --trust            Auto-approve all agent commands (skip approval prompts)
+      -m, --message <text>
+                         Tell the swarm what you changed (saved to Obsidian brain).
+                         Blockers with verify steps are auto-checked on continue.
+
+  adopt [options] -m "what to build for the rest"
+                    Adopt an EXISTING codebase that Swamr did not create. A
+                    discovery agent inventories what already exists, then the
+                    swarm plans + builds ONLY the remaining work from there.
+                    Run 'swamr init' first if .cursor/rules aren't installed.
+
+    Options:
+      --dir <path>       Project directory (default: current dir)
+      --model <model>    Model for planning/worker agents (default: auto)
+      --trust            Auto-approve all agent commands (skip approval prompts)
+      -m, --message <text>
+                         What you want built for the rest of the project.
 
 Examples:
   swamr init ./my-app
@@ -44,6 +61,8 @@ Examples:
   swamr build --trust "A SaaS dashboard with auth, billing, and team management"
   swamr build --dir ./my-app --plan-only "Recipe sharing app with social features"
   swamr continue --dir ./my-app
+  swamr continue -m "OAuth providers enabled; bundle id is com.dealhounder.app"
+  swamr adopt --dir ./my-app -m "Add the redemption history screen and finish checkout"
 `);
 }
 async function main() {
@@ -110,6 +129,7 @@ async function main() {
             let dir = ".";
             let model;
             let trust = false;
+            let message;
             for (let i = 0; i < continueArgs.length; i++) {
                 switch (continueArgs[i]) {
                     case "--dir":
@@ -121,9 +141,39 @@ async function main() {
                     case "--trust":
                         trust = true;
                         break;
+                    case "-m":
+                    case "--message":
+                        message = continueArgs[++i];
+                        break;
                 }
             }
-            await continueBuild(dir, { model, trust });
+            await continueBuild(dir, { model, trust, message });
+            break;
+        }
+        case "adopt": {
+            const adoptArgs = args.slice(1);
+            let dir = ".";
+            let model;
+            let trust = false;
+            let message;
+            for (let i = 0; i < adoptArgs.length; i++) {
+                switch (adoptArgs[i]) {
+                    case "--dir":
+                        dir = adoptArgs[++i];
+                        break;
+                    case "--model":
+                        model = adoptArgs[++i];
+                        break;
+                    case "--trust":
+                        trust = true;
+                        break;
+                    case "-m":
+                    case "--message":
+                        message = adoptArgs[++i];
+                        break;
+                }
+            }
+            await adoptBuild(dir, { model, trust, message });
             break;
         }
         default:

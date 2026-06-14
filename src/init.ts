@@ -93,24 +93,31 @@ export function init(targetDir: string) {
       JSON.stringify(
         {
           version: "1.0.0",
-          max_parallel_agents: 8,
+          // Up to this many agents may be spawned at once in a wave. The full
+          // build still runs ~150+ agents total, spread across many waves.
+          max_parallel_agents: 20,
+          max_concurrent_agents: 20,
           max_retries_per_task: 3,
-          wave_size: 8,
-          verify_wave_size: 6,
+          wave_size: 20,
+          verify_wave_size: 8,
           checkpoint_between_waves: true,
           required_mcps: null,
+          // Hierarchical planning: how many domain sub-planners fan out, and the
+          // target number of build tasks the swarm should produce.
+          domain_planners: 12,
+          min_build_tasks: 150,
           quality_gates: true,
           browser_automation: true,
           phases: [
             "discovery",
             "planning",
             "architecture",
-            "scaffold",
+            "foundation",
             "build",
-            "test",
+            "testing",
             "security",
             "legal",
-            "deploy",
+            "launch",
           ],
           tracks: {
             frontend: true,
@@ -139,6 +146,7 @@ evidence/
 scripts/
 logs/
 blockers/
+planning/
 NEEDS-YOU.md
 *.lock
 `
@@ -181,6 +189,7 @@ swamr/evidence/
 swamr/scripts/
 swamr/logs/
 swamr/blockers/
+swamr/planning/
 swamr/NEEDS-YOU.md
 
 # Obsidian internals (vault content IS tracked)

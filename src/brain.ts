@@ -14,12 +14,15 @@ export function initBrain(projectDir: string) {
     "00-project",
     "01-planning",
     "01-planning/decisions",
+    "01-planning/domains",
     "02-foundation",
     "03-build",
     "03-build/task-outputs",
     "03-build/issues",
+    "03-build/checkpoints",
     "04-testing",
-    "05-hardening",
+    "05-security",
+    "05-legal",
     "06-launch",
     "templates",
     ".obsidian",
@@ -30,29 +33,61 @@ export function initBrain(projectDir: string) {
 
   writeFileDeep(
     path.join(brain, "index.md"),
-    `# Swamr Brain
+    `# Swamr Brain — Map of Content
 
-> The second brain for your agent swarm. Agents read from and write to this vault so no context is ever lost across phases or sessions.
+> The second brain for your agent swarm. Agents read from and write to this vault so no context is ever lost across phases or sessions. The orchestrator regenerates the live status section below after every wave.
 
 ## Quick Links
 - [[00-project/overview|Project Overview]]
 - [[00-project/tech-stack|Tech Stack]]
 - [[00-project/architecture|Architecture]]
+- [[00-project/existing-state|Existing State]] (adopt mode)
 - [[01-planning/task-tree|Task Tree]]
 - [[01-planning/requirements|Requirements]]
+- [[01-planning/domains/_index|Planning Domains]]
 - [[03-build/phase-log|Build Log]]
+
+## Phases
+- [[02-foundation/phase-summary|Foundation]]
+- [[03-build/phase-log|Build]]
+- [[04-testing/phase-summary|Testing (E2E)]]
+- [[05-security/phase-summary|Security Hardening]]
+- [[05-legal/phase-summary|Legal Compliance]]
+- [[06-launch/handoff|Launch / Handoff]]
 
 ## How This Works
 1. The orchestrator initializes this vault when a build starts
-2. Every agent reads relevant notes before starting a task
-3. Every agent writes a task output note when done
-4. Phase summaries capture carry-forward context
-5. You can browse this vault in Obsidian to watch progress in real-time
+2. Every agent reads relevant notes before starting a task AND adopts its specialist persona
+3. Every agent writes a task output note (with [[wikilinks]]) when done
+4. Quality gates + checkpoint agents verify each wave and file fix tasks for any bug
+5. Phase summaries capture carry-forward context
+6. You can browse this vault in Obsidian to watch progress in real-time
 
-## Status
+<!-- SWAMR:LIVE-STATUS:START -->
+## Live Status
 - **Phase**: Not started
 - **Tasks**: 0/0
 - **Last Updated**: —
+<!-- SWAMR:LIVE-STATUS:END -->
+
+## Task Outputs (dataview)
+\`\`\`dataview
+TABLE status, agent, date
+FROM "03-build/task-outputs"
+SORT date DESC
+\`\`\`
+`
+  );
+
+  writeFileDeep(
+    path.join(brain, "01-planning/domains/_index.md"),
+    `# Planning Domains
+
+> The lead architect splits the system into domains during hierarchical planning. Each domain gets its own sub-planner that writes a note here and a slice of the task list.
+
+| Domain | Specialist | Focus |
+|--------|-----------|-------|
+| — | — | — |
 `
   );
 

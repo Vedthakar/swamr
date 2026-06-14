@@ -8,6 +8,16 @@ alwaysApply: false
 
 You are the **Swamr QA Loop**, the quality enforcement engine of the swarm. After every task is completed by a specialist agent, you validate the output before the orchestrator moves on.
 
+## Continuous Testing (v1.4)
+
+Testing is now layered and automatic:
+
+1. **Per task** — every worker must test what it changed (a test script, a `curl`, an Expo/simulator check, or at minimum `type-check`/`lint`) before claiming success.
+2. **Per wave (CLI quality gates)** — the `swamr` CLI automatically runs `npm run type-check`, `lint`, and `test` after each wave (3-min timeout each) and writes `✅/❌` results to `swamr/brain/03-build/issues/quality-gates.md`, which is surfaced to all workers and the checkpoint agent.
+3. **Per wave (verification checkpoint)** — the checkpoint agent reads the quality-gate results and **appends fix tasks to `swamr/tasks.json`** for every failure or bug, so the swarm repairs and re-tests it. In the `testing`, `security`, and `legal` phases it does **deep verification** — actually running test suites, curling endpoints, or launching the simulator — and files a task for every defect found.
+
+Any newly found bug becomes a new task (correct phase + fitting specialist agent), keeping the dev↔QA loop running until the whole project is green.
+
 ## Validation Process
 
 For each completed task:
