@@ -72,6 +72,10 @@ export function init(targetDir) {
             version: "1.0.0",
             max_parallel_agents: 8,
             max_retries_per_task: 3,
+            wave_size: 8,
+            verify_wave_size: 6,
+            checkpoint_between_waves: true,
+            required_mcps: null,
             quality_gates: true,
             browser_automation: true,
             phases: [
@@ -105,6 +109,8 @@ export function init(targetDir) {
 evidence/
 scripts/
 logs/
+blockers/
+NEEDS-YOU.md
 *.lock
 `);
         info("Created swamr/.gitignore");
@@ -140,6 +146,8 @@ swamr/state.json
 swamr/evidence/
 swamr/scripts/
 swamr/logs/
+swamr/blockers/
+swamr/NEEDS-YOU.md
 
 # Obsidian internals (vault content IS tracked)
 swamr/brain/.obsidian/workspace.json

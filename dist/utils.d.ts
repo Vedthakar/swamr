@@ -32,6 +32,9 @@ export declare class ProgressDashboard {
     overallCompleted: number;
     overallTotal: number;
     activeTasks: ProgressTask[];
+    wave: number;
+    checkpoint: boolean;
+    blockedCount: number;
     start(): void;
     private render;
     stop(): void;

@@ -164,6 +164,9 @@ export class ProgressDashboard {
     overallCompleted = 0;
     overallTotal = 0;
     activeTasks = [];
+    wave = 0;
+    checkpoint = false;
+    blockedCount = 0;
     start() {
         if (!isTTY)
             return;
@@ -192,11 +195,17 @@ export class ProgressDashboard {
             ? Math.round((this.phaseCompleted / this.phaseTotal) * 100)
             : 0;
         const phaseBar = progressBar(this.phaseCompleted, this.phaseTotal, barWidth);
-        const phaseLabel = `${CYAN}[${phaseBar}]${RESET} ${String(phasePct).padStart(3)}%  phase ${this.phaseIndex}/${this.totalPhases}: ${this.phase.toUpperCase()} ${this.phaseCompleted}/${this.phaseTotal}`;
+        const waveTag = this.wave > 0 ? `  wave ${this.wave}${this.checkpoint ? " · checkpoint" : ""}` : "";
+        const phaseLabel = `${CYAN}[${phaseBar}]${RESET} ${String(phasePct).padStart(3)}%  phase ${this.phaseIndex}/${this.totalPhases}: ${this.phase.toUpperCase()} ${this.phaseCompleted}/${this.phaseTotal}${waveTag}`;
         lines.push(truncate(phaseLabel, w));
-        // ── Row 3: quip ─────────────────────────────────────────────────────────
-        lines.push(truncate(`${CYAN}${frame}${RESET} ${quip}`, w));
-        // ── Rows 4+: active tasks (up to 6) ────────────────────────────────────
+        // ── Row 3: quip / checkpoint ────────────────────────────────────────────
+        const status = this.checkpoint ? "re-evaluating progress (checkpoint agent)" : quip;
+        lines.push(truncate(`${CYAN}${frame}${RESET} ${status}`, w));
+        // ── Row 4: blocked / NEEDS YOU (always present so height stays stable) ───
+        lines.push(this.blockedCount > 0
+            ? truncate(`${YELLOW}🙋 ${this.blockedCount} task(s) need you — see swamr/NEEDS-YOU.md${RESET}`, w)
+            : "");
+        // ── Rows 5+: active tasks (up to 6) ────────────────────────────────────
         lines.push("");
         const shown = this.activeTasks.slice(0, 6);
         for (const t of shown) {
