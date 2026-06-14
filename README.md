@@ -1,372 +1,430 @@
-# Swamr
+<div align="center">
 
-**An agent swarm for Cursor that builds entire projects autonomously.**
+<img src="https://raw.githubusercontent.com/Vedthakar/swamr/main/assets/cover.png" alt="swamr — agent swarm for Cursor" width="100%" />
 
-Drop Swamr into any project, tell it what to build, and watch 150+ specialist AI agents plan, code, test, and deploy — while an Obsidian vault tracks every decision so no context is ever lost.
+<br />
 
-> Inspired by [Ruflo](https://github.com/hrishioa/ruflo) (autonomous Claude Code orchestrator). Agent skills powered by [Agency Agents](https://github.com/msitarzewski/agency-agents) by [@msitarzewski](https://github.com/msitarzewski).
+# swamr
+
+**Deploy 150+ specialist AI agents that plan, build, test, harden, and ship your entire project — autonomously.**
+
+Drop swamr into any project (new or existing), describe what you want, and a swarm of parallel Cursor agents handles the rest. An Obsidian vault tracks every decision so no context is ever lost between agents.
+
+<br />
+
+[![npm version](https://img.shields.io/badge/swamr-v1.4.0-yellow?style=for-the-badge)](https://github.com/Vedthakar/swamr)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+[![Requires Cursor](https://img.shields.io/badge/Requires-Cursor-purple?style=for-the-badge)](https://cursor.com)
+[![Node 18+](https://img.shields.io/badge/Node-18%2B-green?style=for-the-badge)](https://nodejs.org)
+[![Agency Agents](https://img.shields.io/badge/Powered%20by-Agency%20Agents-orange?style=for-the-badge)](https://github.com/msitarzewski/agency-agents)
+
+</div>
 
 ---
 
-## What It Does
+## What is swamr?
 
-### Two ways to build:
-
-**Option A: CLI Multi-Agent Mode (recommended)** — spawns real parallel agents via `cursor agent`:
-
-```bash
-swamr init ./my-app
-swamr build --dir ./my-app "A SaaS dashboard with auth, billing, and team management"
-```
-
-This spawns **actual separate Cursor agent processes** running in parallel — one per task. A planning agent decomposes your request into 25-40 tasks, then worker agents execute them simultaneously across foundation, build, test, harden, and launch phases.
-
-**Option B: Single-Agent Mode** — use `@swamr-orchestrator` in Cursor's chat:
+Most AI coding tools run one agent at a time. swamr runs **up to 8 specialist agents in parallel**, each owning a specific task, all sharing a structured Obsidian vault so they never lose context between phases.
 
 ```
-@swamr-orchestrator Build me a SaaS dashboard with user auth, 
-team management, billing via Stripe, and a REST API backed by Supabase.
+You type one prompt.
+swamr spawns a planner → 25-40 tasks → parallel specialist agents → production-ready code.
 ```
 
-This runs in one Cursor chat window. Simpler but sequential — one agent does everything by switching personas.
+It supports **four modes**:
 
-### What happens either way:
+| Mode | Command | Best For |
+|------|---------|----------|
+| **Build** | `swamr build "..."` | New projects from scratch |
+| **Adopt** | `swamr adopt -m "..."` | Existing codebases — picks up from wherever you are |
+| **Continue** | `swamr continue` | Resume after interruption or partial completion |
+| **Single-agent** | `@swamr-orchestrator` in Cursor chat | Quick tasks, no terminal needed |
 
-1. Creates an Obsidian vault (`swamr/brain/`) as the project's second brain
-2. Generates a full project plan with 25-40 tasks
-3. Selects the right specialist agent for each task (frontend, backend, security, legal, testing...)
-4. Executes in strict phases — foundation, build, test, harden, launch
-5. Retries failures up to 3x with specific feedback
-6. Writes every decision, output, and issue to the Obsidian brain
-7. Delivers a production-ready, tested codebase
+---
 
-No context is lost between phases because every agent reads from and writes to the shared brain.
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [All Commands](#all-commands)
+- [How It Works](#how-it-works)
+- [The Obsidian Brain](#the-obsidian-brain)
+- [The 150+ Agent Roster](#the-150-agent-roster)
+- [Supabase Setup](#supabase-setup)
+- [MCP Integration](#mcp-integration)
+- [Configuration](#configuration)
+- [Adding Custom Agents](#adding-custom-agents)
+- [Restarting from Scratch](#restarting-from-scratch)
+- [Troubleshooting](#troubleshooting)
+- [Credits](#credits)
 
 ---
 
 ## Prerequisites
 
-| Tool | Required? | Install |
-|------|-----------|---------|
-| **Cursor** | Yes | [cursor.com](https://cursor.com) (Pro recommended for unlimited usage) |
-| **Cursor CLI** | For multi-agent mode | Included with Cursor. Run `cursor agent login` to authenticate. |
-| **Obsidian** | Highly recommended | [obsidian.md](https://obsidian.md) (free) |
-| **Node.js 18+** | Yes | [nodejs.org](https://nodejs.org) |
-| **Git** | Yes | Comes with most OS installs |
-| **Playwright** | Optional | `npx playwright install` (for browser automation) |
-| **Docker Desktop** | **Not for Supabase** | Swamr uses **hosted Supabase only** — no local stack |
+| Tool | Required | Why | Install |
+|------|----------|-----|---------|
+| **Cursor** | ✅ Yes | The IDE that runs the agents | [cursor.com](https://cursor.com) — Pro plan recommended |
+| **Cursor CLI** | ✅ Yes (for CLI mode) | Spawns parallel agent processes | Bundled with Cursor. Run `cursor agent login` once. |
+| **Node.js 18+** | ✅ Yes | Runs the swamr CLI | [nodejs.org](https://nodejs.org) |
+| **Git** | ✅ Yes | Version control for your project | Pre-installed on most systems |
+| **Obsidian** | ⭐ Recommended | View the agent brain vault live | [obsidian.md](https://obsidian.md) — free |
+| **Playwright** | Optional | Browser automation tasks | `npx playwright install` |
+
+> **Cursor Pro note:** The free tier has usage limits. With 8 agents running in parallel, you'll hit them fast. Pro ($20/mo) is effectively required for serious use.
 
 ---
 
-## Supabase projects (hosted only)
+## Installation
 
-Swamr does **not** use Docker or `supabase start`. Local Supabase was removed because it blocked builds reliably.
-
-### You do manually (once per project)
-
-1. **Create a project** — [supabase.com/dashboard](https://supabase.com/dashboard) → New project (save the database password).
-2. **Copy API keys** — Dashboard → **Settings → API**:
-   - **Project URL** → `EXPO_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` in `.env.local`
-   - **anon public** key → `EXPO_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - **service_role** secret → `SUPABASE_SERVICE_ROLE_KEY` (server-only; never ship to clients)
-
-Direct link pattern: `https://supabase.com/dashboard/project/<your-ref>/settings/api`
-
-If keys are missing, Swamr writes `swamr/blockers/F2.json` and continues other tasks until you fill `.env.local`.
-
-### AI handles the rest
-
-Agents use **Supabase MCP** (preferred) or `supabase login` + CLI:
-
-- Link project, push migrations, enable extensions (e.g. PostGIS)
-- **F3+ database schema** — tables, RLS, indexes, seed data via `apply_migration` / `execute_sql`
-- Generate TypeScript types, run connection tests (`npm run test:supabase`)
-
-Never commit `.env.local` — it is gitignored.
-
----
-
-## Setup
-
-### 1. Install Swamr
+Run these commands **once** on your machine. After this, swamr is available globally as the `swamr` command.
 
 ```bash
+# 1. Clone swamr to your home directory
 git clone https://github.com/Vedthakar/swamr.git ~/swamr
+
+# 2. Install dependencies and build the CLI
 cd ~/swamr
 npm install
+
+# 3. Link the CLI globally so 'swamr' works from anywhere
 npm link
 ```
 
-Verify it works:
+Verify installation:
 
 ```bash
 swamr --help
 ```
 
-You should see the Swamr help menu with `init` and `build` commands.
+You should see the swamr help menu listing `init`, `build`, `continue`, and `adopt`.
 
-> **Note:** `npm link` wires the `swamr` command into whichever Node.js version is currently active in your shell. If you switch Node versions with nvm, run `npm link` again from `~/swamr`.
+> **Node version managers (nvm/fnm):** `npm link` ties `swamr` to whichever Node version is active when you run it. If you switch Node versions later, `cd ~/swamr && npm link` again.
 
-### 2. Initialize in Your Project
+---
 
-```bash
-# Create a new project and initialize Swamr in it
-swamr init ./my-new-app
+## Quick Start
 
-# Or initialize in an existing project directory
-cd ./my-existing-app
-swamr init
-```
-
-This does everything automatically:
-- Clones 150+ agent skills from [agency-agents](https://github.com/msitarzewski/agency-agents)
-- Converts them to Cursor `.mdc` rule files
-- Installs the orchestrator, planner, QA loop, and brain system
-- Creates the Obsidian vault structure with templates
-- Sets up git and gitignore
-
-### 3. Open the Brain in Obsidian (optional but recommended)
+### New project from scratch
 
 ```bash
-# In Obsidian: File → Open Vault → select ~/my-new-app/swamr/brain/
-```
+# Step 1: Create and initialize a new project
+swamr init ./my-app
 
-Watch the vault fill up with architecture decisions, task outputs, and progress notes as agents work.
-
-### 4. Build Something
-
-You have two options:
-
-#### Option A: CLI Multi-Agent Mode (recommended for big projects)
-
-This spawns **real parallel agent processes** — multiple agents working simultaneously.
-
-```bash
-# Authenticate cursor CLI first (one-time setup)
+# Step 2: Authenticate Cursor CLI (one-time)
 cursor agent login
 
-# Build your project
-swamr build --dir ./my-new-app "A project management tool with kanban boards and real-time updates"
+# Step 3: Build it
+swamr build --dir ./my-app --trust \
+  "A SaaS dashboard with Supabase auth, billing via Stripe, team management, and a REST API"
 ```
 
-You can also plan first and review before executing:
+That's it. Watch the terminal — agents will appear, work in parallel, and write their outputs to `my-app/swamr/brain/`.
+
+### Existing project (adopt mode)
 
 ```bash
-swamr build --dir ./my-new-app --plan-only "Your app description"
-# Review swamr/plan.md and swamr/tasks.json, then:
-swamr build --dir ./my-new-app --resume
+# Step 1: Initialize swamr rules in your existing project
+cd ./my-existing-app
+swamr init
+
+# Step 2: Tell swamr what's there and what to finish
+swamr adopt --dir . --trust \
+  -m "This is a Next.js app with auth and a home page. Finish the dashboard, add billing with Stripe, and write tests."
 ```
 
-#### Option B: Single-Agent Mode (simpler, runs inside Cursor chat)
-
-1. Open the project in Cursor: `cursor ~/my-new-app`
-2. In the chat panel, click the mode dropdown and select **Agent** (not Chat, not Plan Mode)
-3. Type your prompt:
-
-```
-@swamr-orchestrator Build me a project management tool with kanban boards, 
-team collaboration, real-time updates, and Supabase backend.
-```
-
-> **Important:** Single-agent mode only works in **Agent mode** (the `∞ Agent` option in Cursor's chat dropdown). Regular Chat mode just writes text — it can't read files or run commands. Plan Mode pauses for approval before every action, which slows the swarm to a crawl.
+swamr will first run a **discovery agent** that reads your codebase, then plan only the remaining work.
 
 ---
 
-## How to Get the Best Results
+## All Commands
 
-> **Plan your architecture first.** The single biggest thing you can do for build quality is to think through what you want before the agents start coding.
+### `swamr init [dir]`
 
-### Recommended Workflow
+Initializes swamr in a project directory. Run this **once per project** before building.
 
-1. **Think through your app** — What are the core features? What's the data model? What does the user flow look like?
+```bash
+swamr init              # Initialize in current directory
+swamr init ./my-app     # Initialize in a specific directory
+```
 
-2. **Plan first, build second** — Use the planner to generate a task tree, review it, and adjust before execution:
-   ```
-   @swamr-planner Plan a recipe sharing app with social features, 
-   meal planning, and grocery list generation.
-   ```
-   Review `swamr/plan.md`, make changes, then:
-   ```
-   @swamr-orchestrator Execute the plan
-   ```
+**What it does:**
+- Clones 150+ agent skill definitions from [agency-agents](https://github.com/msitarzewski/agency-agents)
+- Converts them to Cursor `.mdc` rule files in `.cursor/rules/`
+- Installs the orchestrator, planner, QA loop, state manager, and brain system
+- Creates the `swamr/brain/` Obsidian vault with templates
+- Sets up `.gitignore` to protect state and evidence files
 
-3. **Define your phases clearly** — The agents work best when they know the full scope upfront. A vague "build me something cool" produces worse results than "Build a Next.js app with these 5 pages, this database schema, and this auth flow."
-
-4. **Watch the Obsidian vault** — Open `swamr/brain/` in Obsidian to see decisions being made in real-time. If you see the agents going in the wrong direction, you can intervene early.
-
-5. **Let phases complete** — The system works in strict phases (foundation → build → test → harden → launch). Each phase summary carries context forward. Don't skip phases.
+**Where to run it:** From anywhere. Pass the project path as an argument, or `cd` into the project first.
 
 ---
 
-## Architecture
+### `swamr build [options] "description"`
 
-### CLI Multi-Agent Mode (`swamr build`)
+Builds a project from scratch using parallel agents.
+
+```bash
+swamr build --dir ./my-app --trust "description of what to build"
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--dir <path>` | Current directory | The project to build in |
+| `--model <model>` | Auto | LLM model for agents |
+| `--plan-only` | false | Generate the plan but don't execute yet |
+| `--resume` | false | Resume from existing `swamr/state.json` |
+| `--trust` | false | Auto-approve all agent commands (no prompts) |
+
+**Examples:**
+
+```bash
+# Build with auto-approval (recommended for unattended runs)
+swamr build --dir ./my-app --trust \
+  "A habit tracking app with streaks, social accountability, and push notifications"
+
+# Plan first, review, then execute
+swamr build --dir ./my-app --plan-only "An e-commerce store with Stripe payments"
+# Review swamr/plan.md and swamr/tasks.json, make edits, then:
+swamr build --dir ./my-app --trust --resume
+
+# Resume a build that was interrupted
+swamr build --dir ./my-app --trust --resume
+```
+
+---
+
+### `swamr continue [options]`
+
+Resumes a build from `swamr/state.json` without re-planning. Use this when:
+- Your build was interrupted (Ctrl+C, crash, timeout)
+- Some tasks failed and you want to retry them
+- You resolved a blocker and want to pick up from there
+
+```bash
+swamr continue --dir ./my-app --trust
+```
+
+```bash
+# Tell the swarm what changed since last time
+swamr continue --dir ./my-app --trust \
+  -m "I fixed the database password and added the Stripe key to .env.local"
+```
+
+| Option | Description |
+|--------|-------------|
+| `--dir <path>` | Project directory |
+| `--trust` | Auto-approve commands |
+| `-m "message"` | Context about what changed — written to the brain |
+
+---
+
+### `swamr adopt [options] -m "message"`
+
+Adopts an **existing codebase** that swamr didn't create. A discovery agent first inventories what's already built, then the swarm plans and builds only the remaining work.
+
+```bash
+swamr adopt --dir ./my-existing-project --trust \
+  -m "This is a Next.js app with Supabase auth already set up. Build the dashboard, add team management, write tests, and deploy to Vercel."
+```
+
+| Option | Description |
+|--------|-------------|
+| `--dir <path>` | The existing project directory |
+| `--trust` | Auto-approve commands |
+| `-m "message"` | **Required.** Describe what exists and what to finish. |
+
+> **Run `swamr init` first** if the project doesn't have `.cursor/rules/` yet. The `adopt` command needs the agent rules to be installed.
+
+---
+
+## How It Works
+
+### Phase Architecture
 
 ```
 swamr build "description"
-  │
-  ├── PLANNER (1 cursor agent, smart model)
-  │   ├── Reads .cursor/rules/ to understand available agents
-  │   ├── Writes plan.md + tasks.json (25-40 tasks)
-  │   └── Writes architecture to swamr/brain/
-  │
-  ├── FOUNDATION PHASE (2-4 cursor agents in parallel)
-  │   ├── Agent 1: scaffold project
-  │   ├── Agent 2: database schema
-  │   ├── Agent 3: auth system
-  │   └── Agent 4: design system
-  │
-  ├── BUILD PHASE (up to 8 cursor agents in parallel)
-  │   ├── Agent: @frontend-developer → dashboard page
-  │   ├── Agent: @frontend-developer → settings page
-  │   ├── Agent: @backend-architect → API routes
-  │   ├── Agent: @frontend-developer → user profile
-  │   └── ... (tasks dispatched as dependencies resolve)
-  │
-  ├── TESTING PHASE (3-5 cursor agents in parallel)
-  │   ├── Agent: @evidence-collector → unit tests
-  │   ├── Agent: @api-tester → API tests
-  │   └── Agent: @testing-reality-checker → E2E tests
-  │
-  ├── HARDENING PHASE (4 cursor agents in parallel)
-  │   ├── Agent: @security-architect → security audit
-  │   ├── Agent: @performance-benchmarker → perf audit
-  │   ├── Agent: @accessibility-auditor → a11y audit
-  │   └── Agent: @legal-compliance-checker → compliance
-  │
-  └── LAUNCH PHASE (2-3 cursor agents)
-      ├── Agent: @engineering-technical-writer → docs
-      ├── Agent: @devops-automator → deploy
-      └── Agent: @testing-reality-checker → final validation
+    │
+    ▼
+┌─────────────────────────────────────────────────────────┐
+│  WAVE 0 — PLANNER  (1 agent, smarter model)             │
+│  Reads available agents → decomposes into 25-40 tasks   │
+│  Writes: swamr/plan.md + swamr/tasks.json               │
+└───────────────────┬─────────────────────────────────────┘
+                    │
+    ┌───────────────▼──────────────────────────────────────┐
+    │  FOUNDATION WAVE  (2-4 agents in parallel)           │
+    │  ├── Agent: scaffold project structure               │
+    │  ├── Agent: database schema + migrations             │
+    │  ├── Agent: authentication system                    │
+    │  └── Agent: design system + components              │
+    └───────────────┬──────────────────────────────────────┘
+                    │
+    ┌───────────────▼──────────────────────────────────────┐
+    │  BUILD WAVE  (up to 8 agents in parallel)            │
+    │  ├── @frontend-developer  → dashboard page           │
+    │  ├── @frontend-developer  → settings page           │
+    │  ├── @backend-architect   → API routes               │
+    │  ├── @ai-engineer         → AI features             │
+    │  └── ... (dispatched as dependencies resolve)       │
+    └───────────────┬──────────────────────────────────────┘
+                    │
+    ┌───────────────▼──────────────────────────────────────┐
+    │  TEST WAVE  (3-5 agents in parallel)                 │
+    │  ├── @api-tester          → API tests                │
+    │  ├── @evidence-collector  → integration tests        │
+    │  └── @reality-checker     → E2E validation          │
+    └───────────────┬──────────────────────────────────────┘
+                    │
+    ┌───────────────▼──────────────────────────────────────┐
+    │  HARDENING WAVE  (4 agents in parallel)              │
+    │  ├── @security-architect  → security audit           │
+    │  ├── @performance-benchmarker → perf audit           │
+    │  ├── @accessibility-auditor   → a11y audit           │
+    │  └── @legal-compliance-checker → compliance         │
+    └───────────────┬──────────────────────────────────────┘
+                    │
+    ┌───────────────▼──────────────────────────────────────┐
+    │  LAUNCH WAVE  (2-3 agents)                           │
+    │  ├── @technical-writer    → docs + README            │
+    │  ├── @devops-automator    → deploy                   │
+    │  └── @reality-checker     → final validation        │
+    └─────────────────────────────────────────────────────┘
 ```
 
-Each box is a **real separate `cursor agent` process** running in its own context. They share the codebase via the filesystem and the Obsidian brain vault.
+Each box is a **real separate `cursor agent` process**. They run simultaneously on your machine, sharing the codebase via the filesystem and sharing context via the Obsidian brain vault.
 
-### Single-Agent Mode (`@swamr-orchestrator` in Cursor chat)
+### State & Resume
 
-```
-@swamr-orchestrator
-  │
-  ├── Initializes Obsidian brain (swamr/brain/)
-  ├── @swamr-planner (decomposes into phased tasks)
-  ├── @swamr-skill-selector (picks agent per task)
-  ├── FOR EACH phase → FOR EACH task:
-  │   ├── @[specialist-agent] builds it
-  │   ├── @swamr-qa-loop validates it
-  │   └── Retry or advance
-  └── @swamr-state-manager (tracks progress)
-```
+Every task completion is written to `swamr/state.json`. If the build is interrupted for any reason — crash, timeout, you pressed Ctrl+C, your laptop died — run `swamr continue` and it picks up from the exact task that was in progress.
 
-### The Obsidian Brain
+### Blockers
 
-The brain is what makes Swamr different from just using Cursor normally. It's a structured Obsidian vault that agents use as shared memory:
+When an agent hits something it can't do autonomously (needs an API key, a human login, a billing step), it writes a blocker file to `swamr/blockers/<task-id>.json` and stops. The build continues with other tasks. A `NEEDS-YOU.md` file is written to the project root listing everything that needs your attention.
 
-```
-swamr/brain/
-├── 00-project/          # What we're building and why
-│   ├── overview.md
-│   ├── tech-stack.md
-│   ├── architecture.md
-│   └── glossary.md
-├── 01-planning/         # How we're building it
-│   ├── requirements.md
-│   ├── task-tree.md
-│   ├── risk-register.md
-│   └── decisions/       # Architecture Decision Records
-├── 02-foundation/       # Foundation phase outputs
-├── 03-build/            # Build phase
-│   ├── phase-log.md     # Running timeline
-│   ├── task-outputs/    # One note per completed task
-│   └── issues/          # Bugs and problems found
-├── 04-testing/          # Test plans and results
-├── 05-hardening/        # Security, perf, a11y, legal
-├── 06-launch/           # Deploy runbooks and handoff
-└── templates/           # Note templates agents use
-```
-
-**Every agent reads before working and writes after completing.** Phase summaries carry context forward so the 50th task has the same understanding as the 1st.
-
-### Available Agents (150+)
-
-Swamr installs the full [Agency Agents](https://github.com/msitarzewski/agency-agents) roster:
-
-| Category | Examples | Count |
-|----------|---------|-------|
-| **Engineering** | frontend-developer, backend-architect, devops-automator, ai-engineer, database-optimizer | ~30 |
-| **Testing & QA** | evidence-collector, reality-checker, api-tester, performance-benchmarker, accessibility-auditor | ~8 |
-| **Security** | security-architect, appsec-engineer, compliance-auditor, penetration-tester | ~10 |
-| **Design** | ui-designer, ux-architect, brand-guardian, ux-researcher | ~9 |
-| **Product & PM** | project-manager-senior, sprint-prioritizer, workflow-architect | ~8 |
-| **Marketing** | growth-hacker, seo-specialist, content-creator, social-media-strategist | ~15 |
-| **Finance & Legal** | financial-analyst, legal-compliance-checker, bookkeeper-controller | ~5 |
-| **Support & Ops** | analytics-reporter, infrastructure-maintainer, technical-writer | ~6 |
-| **Specialized** | prompt-engineer, data-privacy-officer, grant-writer, and many more | ~50+ |
-
-The orchestrator automatically selects the right agent for each task based on the task description and tech stack.
+Once you resolve the blocker and delete the file, `swamr continue` requeues the blocked task.
 
 ---
 
-## Usage Patterns
+## The Obsidian Brain
 
-### CLI Multi-Agent: Build a full project
-```bash
-swamr build --dir ./my-app "A habit tracking app with streaks, social accountability, and push notifications"
+The brain is what separates swamr from just using Cursor manually. It's a structured vault that agents use as **shared persistent memory** — so the 50th agent has the same context as the 1st.
+
 ```
-
-### CLI Multi-Agent: Plan only, review, then execute
-```bash
-# Generate the plan without executing
-swamr build --dir ./my-app --plan-only "An e-commerce platform with product catalog, cart, and Stripe payments"
-
-# Review swamr/plan.md and swamr/tasks.json, make changes, then:
-swamr build --dir ./my-app --resume
-```
-
-### CLI Multi-Agent: Resume after interruption
-```bash
-swamr build --dir ./my-app --resume
-```
-
-### Single-Agent: Build in Cursor chat
-```
-@swamr-orchestrator Build me a habit tracking app with streaks, 
-social accountability, push notifications, and a React Native mobile client.
-```
-
-### Single-Agent: Plan first, review, then execute
-```
-@swamr-planner Plan an e-commerce platform with product catalog, 
-cart, checkout, Stripe payments, and admin dashboard.
-
-# Review swamr/plan.md and swamr/brain/01-planning/task-tree.md
-# Make any changes you want, then:
-
-@swamr-orchestrator Execute the plan
+swamr/brain/
+├── 00-project/
+│   ├── overview.md          ← What we're building and why
+│   ├── tech-stack.md        ← Every technology decision and why
+│   ├── architecture.md      ← System design and diagrams
+│   └── glossary.md          ← Domain-specific terms
+│
+├── 01-planning/
+│   ├── requirements.md      ← Full feature requirements
+│   ├── task-tree.md         ← Dependency graph of all tasks
+│   ├── risk-register.md     ← Known risks and mitigations
+│   └── decisions/           ← Architecture Decision Records (ADRs)
+│
+├── 02-foundation/           ← Foundation phase outputs
+│
+├── 03-build/
+│   ├── phase-log.md         ← Running timeline of what happened
+│   ├── task-outputs/        ← One note per completed task
+│   └── issues/              ← Bugs and blockers found during build
+│
+├── 04-testing/              ← Test plans and results
+│
+├── 05-hardening/            ← Security, performance, a11y, legal reports
+│
+├── 06-launch/               ← Deploy runbooks and handoff docs
+│
+└── templates/               ← Note templates used by agents
 ```
 
-### Resume in Cursor chat
-```
-@swamr-orchestrator Resume the build
-```
-The orchestrator reads `swamr/state.json` and the latest brain notes to pick up exactly where it left off.
+**Open it in Obsidian** (`File → Open Vault → select swamr/brain/`) and watch notes appear in real time as agents work. Graph view shows how decisions connect. You can edit notes mid-build to steer the agents.
 
-### Check progress
-```
-@swamr-state-manager Show progress report
-```
+Every agent **reads** the brain before starting its task and **writes** a completion note after finishing. This is non-negotiable — it's enforced in the agent rules.
 
-### Use a specific agent directly
+---
+
+## The 150+ Agent Roster
+
+swamr includes the full [Agency Agents](https://github.com/msitarzewski/agency-agents) roster plus swamr-specific orchestration agents:
+
+| Category | Agents |
+|----------|--------|
+| **Engineering** | `frontend-developer`, `backend-architect`, `devops-automator`, `ai-engineer`, `database-optimizer`, `mobile-app-builder`, `software-architect`, `data-engineer`, `embedded-firmware-engineer`, `rapid-prototyper` |
+| **Testing & QA** | `evidence-collector`, `reality-checker`, `api-tester`, `performance-benchmarker`, `accessibility-auditor`, `model-qa-specialist`, `test-results-analyzer` |
+| **Security** | `security-architect`, `application-security-engineer`, `senior-secops-engineer`, `compliance-auditor`, `penetration-tester`, `cloud-security-architect`, `blockchain-security-auditor` |
+| **Design & UX** | `ui-designer`, `ux-architect`, `ux-researcher`, `brand-guardian`, `visual-storyteller`, `whimsy-injector` |
+| **Product** | `product-manager`, `sprint-prioritizer`, `workflow-architect`, `senior-project-manager`, `game-designer` |
+| **Marketing** | `growth-hacker`, `seo-specialist`, `content-creator`, `social-media-strategist`, `email-marketing-strategist`, `tiktok-strategist`, `linkedin-content-creator` |
+| **Finance & Legal** | `financial-analyst`, `legal-compliance-checker`, `bookkeeper-controller`, `tax-strategist`, `data-privacy-officer` |
+| **Swamr System** | `swamr-orchestrator`, `swamr-planner`, `swamr-skill-selector`, `swamr-qa-loop`, `swamr-state-manager`, `swamr-obsidian-brain` |
+
+The orchestrator automatically picks the right agent for each task based on the task description, tech stack, and what's already been built.
+
+**Use any agent directly** in Cursor chat without running a full build:
+
 ```
-@frontend-developer Build a responsive data table with sorting, filtering, and pagination
-@security-architect Audit the authentication implementation for vulnerabilities
+@frontend-developer Build a responsive data table with sorting and pagination
+@security-architect Audit the authentication flow for vulnerabilities
 @backend-architect Design the API for real-time collaborative editing
+@data-privacy-officer Review this feature for GDPR compliance
 ```
+
+---
+
+## Supabase Setup
+
+swamr uses **hosted Supabase only** — no Docker, no `supabase start`. Local Supabase was removed because it blocked builds reliably across different machines.
+
+### What you do manually (once per project)
+
+1. Go to [supabase.com/dashboard](https://supabase.com/dashboard) → **New project**
+2. Save the database password somewhere safe
+3. Go to **Settings → API** and copy:
+
+| Key | Env var name | Used for |
+|-----|-------------|---------|
+| Project URL | `NEXT_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_URL` | Frontend + backend |
+| `anon` public key | `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Frontend (safe to expose) |
+| `service_role` key | `SUPABASE_SERVICE_ROLE_KEY` | Backend only — **never ship to frontend** |
+
+4. Add these to `.env.local` in your project root
+
+### What the agents handle automatically
+
+Once keys are in `.env.local`, the agents use the **Supabase MCP** or the Supabase CLI to:
+- Link the project (`supabase link`)
+- Apply migrations (`supabase db push`)
+- Enable extensions (PostGIS, pgvector, etc.)
+- Create tables, RLS policies, indexes, and seed data
+- Generate TypeScript types (`supabase gen types typescript`)
+- Run connection tests
+
+**If keys are missing:** agents write `swamr/blockers/F2.json` and continue other tasks. You'll see it in `NEEDS-YOU.md`. Add the keys and run `swamr continue`.
+
+---
+
+## MCP Integration
+
+If you have MCP servers configured in Cursor, agents detect and use them automatically:
+
+| MCP Server | What agents use it for |
+|-----------|----------------------|
+| **Supabase** | Database operations, migrations, edge functions, type generation |
+| **Vercel** | Deployments, environment variable management |
+| **GitHub** | Repo operations, PR management, branch creation |
+| **Slack** | Build progress notifications |
+| Any other | Detected from your Cursor MCP config and used when relevant |
+
+No configuration needed — agents read your Cursor MCP settings and adapt.
 
 ---
 
 ## Configuration
 
-Edit `swamr/config.json` to customize behavior:
+Edit `swamr/config.json` to customize build behavior:
 
 ```json
 {
@@ -374,121 +432,178 @@ Edit `swamr/config.json` to customize behavior:
   "max_retries_per_task": 3,
   "quality_gates": true,
   "browser_automation": true,
+  "wave_size": 8,
+  "verify_wave_size": 4,
   "phases": [
     "discovery",
     "planning",
-    "architecture",
-    "scaffold",
+    "foundation",
     "build",
     "test",
-    "security",
-    "legal",
-    "deploy"
+    "harden",
+    "launch"
   ]
 }
 ```
 
----
-
-## MCP Integration
-
-If you have MCP servers configured in Cursor, the agents use them automatically:
-
-| MCP Server | Used For |
-|-----------|---------|
-| Supabase | Database operations, migrations, edge functions |
-| Vercel | Deployments |
-| GitHub | Repo operations, PR management |
-| Slack | Build notifications |
-| Any other | Detected and used when relevant |
-
----
-
-## Updating
-
-```bash
-cd ~/swamr
-git pull
-npm install
-
-# Then re-init any project to get the latest agents and rules
-swamr init ~/path/to/your/project
-```
-
-The agency-agents repo is re-pulled automatically during init.
+| Key | Default | Description |
+|-----|---------|-------------|
+| `max_parallel_agents` | `8` | Max concurrent agent processes |
+| `max_retries_per_task` | `3` | How many times to retry a failed task |
+| `quality_gates` | `true` | Run QA validation after each task |
+| `wave_size` | `8` | Agents per build wave |
+| `verify_wave_size` | `4` | Agents per verification wave |
 
 ---
 
 ## Adding Custom Agents
 
-Create a `.cursor/rules/my-agent.mdc` in your project:
+Create a `.mdc` file in your project's `.cursor/rules/` directory:
+
+```bash
+touch .cursor/rules/my-specialist.mdc
+```
+
+Paste this template and fill it in:
 
 ```yaml
 ---
-description: "My custom agent — describe what it specializes in"
+description: "My specialist — one sentence describing what it does"
 globs: ""
 alwaysApply: false
 ---
 
-# My Agent
+# My Specialist
 
-You are **My Agent**, a specialist in [domain].
+You are **My Specialist**, an expert in [domain].
 
 ## Your Mission
-[What this agent does]
+[What this agent should accomplish]
+
+## How You Work
+[Step-by-step behavior]
 
 ## Rules
-[How it should behave]
+- [Rule 1]
+- [Rule 2]
 ```
 
-Reference it in prompts: `@my-agent Do the thing`
+Use it in Cursor chat: `@my-specialist Do the thing`
+
+Or reference it in the swamr orchestrator prompt:
+```
+@swamr-orchestrator Build a payment system using @my-specialist for the payment logic
+```
 
 ---
 
-## How It Works Under the Hood
+## Restarting from Scratch
 
-### `swamr init` (setup)
+**If you want to completely reset a build and start over:**
 
-TypeScript CLI that clones agency-agents, converts 232 agent definitions to Cursor `.mdc` rules, scaffolds the Obsidian vault, and configures the project. Run once per project.
+```bash
+# 1. Delete all swamr state (keeps your code)
+rm -rf ./my-app/swamr/state.json
+rm -rf ./my-app/swamr/brain/
+rm -rf ./my-app/swamr/evidence/
+rm -rf ./my-app/swamr/blockers/
 
-### `swamr build` (multi-agent execution)
+# 2. Optionally delete generated code too
+rm -rf ./my-app/src/
+rm -rf ./my-app/dist/
 
-TypeScript CLI that uses `cursor agent` to spawn **real parallel agent processes**:
+# 3. Re-init and rebuild
+swamr init ./my-app
+swamr build --dir ./my-app --trust "your description"
+```
 
-1. **Planning phase** — Spawns a single planning agent (smarter model) that reads the `.cursor/rules/` directory, decomposes the project into 25-40 tasks with dependencies, and writes `swamr/tasks.json` + `swamr/plan.md`
-2. **Execution phases** — For each phase (foundation → build → testing → hardening → launch), spawns up to `max_parallel_agents` (default: 8) `cursor agent` processes in parallel, each with its own task, role, and prompt
-3. **Dependency resolution** — Tasks only start when all their `depends_on` tasks are completed. New batches are dispatched as dependencies resolve.
-4. **Retry logic** — Failed tasks retry up to `max_retries_per_task` (default: 3) times with specific feedback about the failure
-5. **Brain integration** — Each agent gets the Obsidian brain context injected into its prompt. Task outputs are written to `swamr/brain/03-build/task-outputs/`. Phase summaries are written at the end of each phase.
-6. **Resume** — State is saved to `swamr/state.json` after every task. Use `swamr build --resume` to pick up where you left off.
+**If you just want to retry failed tasks (not start over):**
 
-### Single-agent mode (`@swamr-orchestrator`)
+```bash
+swamr continue --dir ./my-app --trust
+```
 
-When you use Cursor's chat with `@swamr-orchestrator`, a single agent handles everything sequentially by switching between specialist personas via `@mentions`.
+**If agents are stuck or frozen:**
 
-### Key files
+```bash
+# Kill all running cursor agent processes
+pkill -f "cursor agent"
 
-| File | Purpose |
-|------|---------|
-| `swamr/tasks.json` | Machine-readable task list with dependencies |
-| `swamr/state.json` | Execution state for resume capability |
-| `swamr/plan.md` | Human-readable project plan |
-| `swamr/brain/` | Obsidian vault — shared memory between agents |
-| `swamr/config.json` | Agent limits, retry counts, phase config |
-| `.cursor/rules/*.mdc` | 232 agent personas + orchestrator rules |
+# Wait 5 seconds, then resume
+sleep 5
+swamr continue --dir ./my-app --trust
+```
 
-No external servers. No API keys. Just `cursor agent` CLI + files on disk.
+**If swamr itself needs to be updated:**
+
+```bash
+cd ~/swamr
+git pull
+npm install
+npm link  # re-link after update
+
+# Re-init your project to get the latest agent rules
+swamr init ./my-app
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `swamr: command not found` | Run `cd ~/swamr && npm link` again |
+| `cursor agent login` fails | Open Cursor app → sign in → retry CLI login |
+| Agents are writing but nothing's happening | Check `swamr/blockers/` — there may be a blocker waiting for your input |
+| Build stopped mid-way | Run `swamr continue --dir ./my-app --trust` |
+| Supabase connection error | Check `.env.local` has all 3 keys (URL, anon key, service role key) |
+| `npm link` breaks after Node version change | `cd ~/swamr && npm link` with the new Node version active |
+| Agent keeps failing the same task | Check `swamr/brain/03-build/issues/` for logged errors; edit the task in `swamr/tasks.json` to add more context, then `swamr continue` |
+| Out of Cursor credits | Upgrade to Cursor Pro; or wait for the monthly reset |
+| Google Maps key warning | Add `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` or `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to `.env.local` |
+| `build.db: database is locked` (Xcode) | `pkill -f xcodebuild && rm -f path/to/build.db` then retry |
+
+---
+
+## Project Structure Reference
+
+```
+~/swamr/                    ← swamr CLI installation (not your project)
+├── src/                    ← TypeScript source for the CLI
+│   ├── cli.ts              ← Entry point and command parser
+│   ├── init.ts             ← swamr init logic
+│   ├── build.ts            ← swamr build / continue / adopt logic
+│   └── brain.ts            ← Obsidian brain scaffolding
+├── dist/                   ← Compiled CLI (built from src/)
+├── rules/                  ← Base swamr agent rules
+└── package.json
+
+your-project/               ← Your actual project
+├── .cursor/
+│   └── rules/              ← 150+ agent .mdc files (installed by swamr init)
+├── swamr/
+│   ├── brain/              ← Obsidian vault (open this in Obsidian)
+│   ├── plan.md             ← Human-readable project plan
+│   ├── tasks.json          ← Machine-readable task list with dependencies
+│   ├── state.json          ← Execution state (gitignored — used for resume)
+│   ├── config.json         ← Agent limits and phase configuration
+│   ├── blockers/           ← Files written when agents need human input
+│   ├── evidence/           ← QA screenshots and logs (gitignored)
+│   └── NEEDS-YOU.md        ← List of things waiting for your action
+├── src/                    ← Your app source code
+└── .env.local              ← Your secrets (gitignored — never commit this)
+```
 
 ---
 
 ## Credits
 
-- **Inspired by [Ruflo](https://github.com/hrishioa/ruflo)** — the autonomous orchestrator for Claude Code that showed what's possible with agent swarms
-- **Agent skills by [Agency Agents](https://github.com/msitarzewski/agency-agents)** by [@msitarzewski](https://github.com/msitarzewski) — the incredible open-source roster of 150+ specialist AI agent definitions
+- **Inspired by [Ruflo](https://github.com/hrishioa/ruflo)** — the autonomous Claude Code orchestrator that proved what agent swarms can do
+- **Agent skills by [Agency Agents](https://github.com/msitarzewski/agency-agents)** by [@msitarzewski](https://github.com/msitarzewski) — the open-source roster of 150+ specialist AI agent definitions that power the swarm
 - **Built for [Cursor](https://cursor.com)** — the AI-first code editor
 
 ---
 
 ## License
 
-MIT
+MIT — built by [Ved Thakar](https://github.com/Vedthakar)
