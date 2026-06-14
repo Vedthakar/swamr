@@ -113,3 +113,38 @@ Every piece of code must:
 - Not break existing tests (`npm test`)
 - Handle errors gracefully (no unhandled promise rejections)
 - Be accessible (semantic HTML, ARIA labels where needed)
+
+## Manual-Step / Human Handoff Protocol (MANDATORY)
+
+Agents run headless. They CANNOT complete a step that requires the human — authenticating an
+MCP server, providing an API key/secret, creating or upgrading an account, billing, or clicking
+through a web GUI. NEVER silently wait, retry forever, or fake the result.
+
+If you are blocked on a human-only step:
+1. Write `swamr/blockers/<task-id>.json` with this exact shape:
+   ```json
+   {
+     "task_id": "<id>",
+     "title": "<short title of what's blocked>",
+     "what_i_need": "<the precise manual action the user must take>",
+     "why": "<why you cannot proceed without it>",
+     "steps": ["<step 1>", "<step 2>"]
+   }
+   ```
+2. Stop and end your turn. The orchestrator marks the task `blocked` (not failed — it is NOT
+   retried), keeps other tasks running, and surfaces a batched "🙋 NEEDS YOU" list to the user
+   plus `swamr/NEEDS-YOU.md`. Once the user resolves it and deletes the blocker file, `swamr
+   build --resume` requeues the task.
+
+Before the swarm starts, the orchestrator runs an MCP preflight (`cursor agent mcp list`). If a
+required MCP server is `not loaded (needs approval)` / not authenticated, it stops and tells the
+user to run `cursor agent mcp login <server>` (or approve it in Cursor → Settings → MCP) before
+continuing — so we never repeat the silent Supabase-auth hang.
+
+## Wave-Based Execution & Re-Evaluation
+
+The swarm runs tasks in waves (`wave_size`, default 8; verification phases use `verify_wave_size`,
+default 6). Between waves a single re-evaluation checkpoint agent reads the brain + state, reports
+real progress, flags stuck/duplicate work, and may split a large or stuck task into smaller
+subtasks (appended to `swamr/tasks.json`). To scale, the planner splits aggressively into many
+small, independent tasks so each wave is wide.

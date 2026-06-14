@@ -271,12 +271,20 @@ Every phase transition requires:
 - No critical issues open
 - Evidence (screenshots, test results) saved to `swamr/evidence/`
 
-## Parallel Execution
+## Parallel Execution (Waves + Re-Evaluation)
 
 When tasks have no dependencies on each other, dispatch them in parallel:
 - Use Cursor's background agent feature when available
 - Otherwise, batch independent tasks and process them sequentially
-- Maximum parallel agents: read from `swamr/config.json` (default: 8)
+- Wave size: read `wave_size` from `swamr/config.json` (default: 8); verification phases use
+  `verify_wave_size` (default: 6)
+
+Run in waves to scale: dispatch a wave of `wave_size` ready tasks, then run ONE re-evaluation
+checkpoint agent (@reality-checker) that reads `swamr/state.json` + the brain, reports real
+progress, flags stuck/duplicate/failed work, and splits oversized or stuck tasks into smaller
+subtasks (append them to `swamr/tasks.json`). Then run the next wave. Repeat until the phase is
+done. This is how the swarm churns through many more agents than run at once — split tasks finely
+so each wave is wide.
 
 ## Communication Style
 
@@ -296,6 +304,16 @@ If the project has MCP servers configured in Cursor, use them:
 - **Any other MCP**: Check what's available and use when appropriate
 
 The orchestrator should inspect available MCP tools at the start of execution and factor them into the agent dispatch strategy.
+
+**MCP preflight (do this first):** run `cursor agent mcp list`. If a required server is `not
+loaded (needs approval)` or not authenticated, STOP and tell the user the exact fix — `cursor
+agent mcp login <server>` or approve it in Cursor → Settings → MCP — before dispatching agents.
+Headless agents cannot complete interactive MCP auth and will otherwise hang silently.
+
+**Manual-step handoff:** if any agent gets blocked on a human-only step (MCP auth, API key,
+account, billing, GUI click), it writes `swamr/blockers/<task-id>.json` and stops. Mark that task
+`blocked` (do not retry), keep other tasks running, and surface a batched "🙋 NEEDS YOU" list to
+the user with step-by-step instructions (also written to `swamr/NEEDS-YOU.md`).
 
 ## Starting a New Project
 
