@@ -76,15 +76,17 @@ main();
 
 ## Common Automation Tasks
 
-### Supabase Project Setup
-When the Supabase CLI or MCP is not available:
-1. Navigate to app.supabase.com
-2. Create new project
-3. Configure auth providers
-4. Set up RLS policies via SQL editor
-5. Save connection string to `.env.local`
+### Supabase Project Setup (hosted only — no Docker)
 
-**Prefer Supabase CLI** (`supabase init`, `supabase db push`) when possible. Only use browser automation as fallback.
+**Human manual steps** (write blocker if missing; link to dashboard):
+1. [supabase.com/dashboard](https://supabase.com/dashboard) → New project (save DB password)
+2. Settings → API → copy Project URL, `anon` public key, `service_role` secret → `.env.local`
+
+**AI steps** (Supabase MCP preferred):
+- `list_projects`, `apply_migration`, `execute_sql`, `list_tables`, `generate_typescript_types`
+- Schema / RLS / seeds for F3+ — never Docker or `supabase start`
+
+Prefer MCP over browser. Browser automation only if MCP auth fails and user must click the dashboard.
 
 ### OAuth Provider Configuration
 1. Navigate to provider's developer console

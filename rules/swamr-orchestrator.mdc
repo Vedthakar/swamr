@@ -65,6 +65,22 @@ Ask clarifying questions ONLY if critical information is missing. Otherwise, mak
 - Key features that aren't obvious from the description
 - Any integrations needed
 
+### Supabase: Hosted Only (No Docker)
+
+When the stack includes Supabase:
+
+**Human (manual — blocker if missing):**
+1. Create project at [supabase.com/dashboard](https://supabase.com/dashboard)
+2. Copy from **Settings → API**: Project URL, `anon` key, `service_role` key → `.env.local`
+3. Save database password from project creation
+
+**AI (never Docker / never `supabase start`):**
+- Supabase MCP: `list_projects`, `apply_migration`, `execute_sql`, `list_tables`, `generate_typescript_types`
+- Link + `db push` if CLI authenticated; run `test:supabase`
+- F3+ schema, RLS, indexes, seeds — all via MCP migrations
+
+Write `swamr/blockers/F2.json` with dashboard links if keys/project missing. Continue other tasks. Do not fall back to Docker.
+
 ### Step 2: Generate the Project Plan
 Create `swamr/plan.md` with this structure:
 

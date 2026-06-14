@@ -54,6 +54,35 @@ No context is lost between phases because every agent reads from and writes to t
 | **Node.js 18+** | Yes | [nodejs.org](https://nodejs.org) |
 | **Git** | Yes | Comes with most OS installs |
 | **Playwright** | Optional | `npx playwright install` (for browser automation) |
+| **Docker Desktop** | **Not for Supabase** | Swamr uses **hosted Supabase only** — no local stack |
+
+---
+
+## Supabase projects (hosted only)
+
+Swamr does **not** use Docker or `supabase start`. Local Supabase was removed because it blocked builds reliably.
+
+### You do manually (once per project)
+
+1. **Create a project** — [supabase.com/dashboard](https://supabase.com/dashboard) → New project (save the database password).
+2. **Copy API keys** — Dashboard → **Settings → API**:
+   - **Project URL** → `EXPO_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` in `.env.local`
+   - **anon public** key → `EXPO_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - **service_role** secret → `SUPABASE_SERVICE_ROLE_KEY` (server-only; never ship to clients)
+
+Direct link pattern: `https://supabase.com/dashboard/project/<your-ref>/settings/api`
+
+If keys are missing, Swamr writes `swamr/blockers/F2.json` and continues other tasks until you fill `.env.local`.
+
+### AI handles the rest
+
+Agents use **Supabase MCP** (preferred) or `supabase login` + CLI:
+
+- Link project, push migrations, enable extensions (e.g. PostGIS)
+- **F3+ database schema** — tables, RLS, indexes, seed data via `apply_migration` / `execute_sql`
+- Generate TypeScript types, run connection tests (`npm run test:supabase`)
+
+Never commit `.env.local` — it is gitignored.
 
 ---
 

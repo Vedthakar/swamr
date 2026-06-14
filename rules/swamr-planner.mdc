@@ -71,7 +71,7 @@ Generated: [date]
 | ID | Task | Agent | Size | Depends On | Criteria |
 |----|------|-------|------|------------|----------|
 | F1 | Scaffold Next.js project | @devops-automator | S | — | Project runs on localhost |
-| F2 | Set up Supabase project | @backend-architect | S | — | DB accessible, migrations dir created |
+| F2 | Connect hosted Supabase (no Docker) | @backend-architect | S | — | Dashboard project created, linked, migrations pushed, `.env.local` set, `test:supabase` passes |
 | F3 | Design database schema | @database-optimizer | M | F2 | All tables created with RLS policies |
 | F4 | Implement auth flow | @backend-architect | M | F2, F3 | Login/signup/logout working |
 | F5 | Set up CI/CD | @devops-automator | S | F1 | GitHub Actions running on push |
@@ -119,6 +119,47 @@ Generated: [date]
 - Phase 4: ~[X] agent sessions
 - Phase 5: ~[X] agent sessions
 ```
+
+## Supabase: Hosted Only (No Docker)
+
+**Never plan local Supabase, Docker, or `supabase start`.** Local stacks caused unreliable builds; hosted + MCP is the default.
+
+### Human manual steps (F2 only — write a blocker if missing)
+
+The user must do these once per project. Agents **must not** retry Docker or local stacks.
+
+| Step | Where | What to copy |
+|------|--------|----------------|
+| 1. Create project | [supabase.com/dashboard](https://supabase.com/dashboard) → **New project** | Project name, region, **database password** (save securely) |
+| 2. Project URL | Dashboard → **Settings → API** | `https://<project-ref>.supabase.co` |
+| 3. Anon key | Same page → **Project API keys** → `anon` `public` | Into `.env.local` as `EXPO_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| 4. Service role key | Same page → `service_role` `secret` | Into `.env.local` as `SUPABASE_SERVICE_ROLE_KEY` (server-only, never client) |
+| 5. (Optional) CLI auth | Terminal: `supabase login` | Only if MCP is unavailable |
+
+Tell the user exactly which keys are missing and link: `https://supabase.com/dashboard/project/<ref>/settings/api`
+
+### AI handles everything else (F2 completion + F3+ schema)
+
+After keys are in `.env.local`, agents own the rest via **Supabase MCP** (preferred) or CLI:
+
+- `list_projects` — find the linked project
+- `apply_migration` / `execute_sql` — schema, RLS, indexes, PostGIS
+- `list_tables`, `list_migrations`, `get_advisors` — verify state
+- `generate_typescript_types` — client types
+- `supabase link --project-ref <ref>` + `supabase db push` — when CLI is authenticated
+- `npm run test:supabase` — prove live connectivity
+
+**F3 (database schema)** and later DB tasks: design tables, RLS, geospatial indexes, seed data — all via MCP migrations. **No browser/Docker.**
+
+### F2 task template
+
+| ID | Task | Agent | Criteria |
+|----|------|-------|------------|
+| F2 | Connect hosted Supabase | @backend-architect | User created project + API keys in `.env.local`; agent linked/pushed migrations; `test:supabase` passes |
+
+Do **not** create F2a/F2b or local Docker verify tasks. One hosted F2 only.
+
+If blocked on human steps, write `swamr/blockers/F2.json` with the table above — then stop.
 
 ## Task Sizing Guide
 

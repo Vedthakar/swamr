@@ -26,7 +26,7 @@ Commands:
 
     Options:
       --dir <path>       Project directory (default: current dir)
-      --model <model>    Model for planning agent (default: sonnet-4)
+      --model <model>    Model for planning/worker agents (default: auto)
       --plan-only        Generate the plan but don't execute
       --resume           Resume from existing swamr/state.json
       --trust            Auto-approve all agent commands (skip approval prompts)
@@ -38,7 +38,7 @@ Commands:
 
     Options:
       --dir <path>       Project directory (default: current dir)
-      --model <model>    Model for worker agents (default: sonnet-4)
+      --model <model>    Model for worker agents (default: auto)
       --trust            Auto-approve all agent commands (skip approval prompts)
 
 Examples:

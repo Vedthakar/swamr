@@ -49,7 +49,8 @@ const MANUAL_STEP_PATTERNS: RegExp[] = [
   /needs approval/i,
   /not authenticated/i,
   /requires? (?:an? )?api[ _-]?key/i,
-  /supabase/i,
+  /supabase login/i,
+  /supabase link/i,
   /create (?:a )?(?:new )?project/i,
   /\bdashboard\b/i,
   /sign ?up/i,
@@ -61,6 +62,8 @@ const MANUAL_STEP_PATTERNS: RegExp[] = [
   /\bmcp\b[^.\n]*\b(login|auth)/i,
   /please (?:authenticate|log ?in|sign ?in|approve)/i,
   /awaiting (?:user|human|manual)/i,
+  /usage limit/i,
+  /spend limit/i,
 ];
 
 function loadConfig(projectDir: string): SwamrConfig {
@@ -161,6 +164,20 @@ function writeBlocker(projectDir: string, blocker: Blocker) {
 // Infer a blocker from agent output when the worker didn't write one itself.
 function detectManualStep(output: string, task: TaskDef): Blocker | null {
   if (!MANUAL_STEP_PATTERNS.some((re) => re.test(output))) return null;
+  if (/usage limit|spend limit/i.test(output)) {
+    return {
+      task_id: task.id,
+      title: `${task.description} (model usage limit reached)`,
+      what_i_need:
+        "Cursor model usage limit was reached for this worker model, so the task cannot run until the model is changed or quota resets.",
+      why: "The worker output reports model usage/spend limit exhaustion.",
+      steps: [
+        "Retry with an available model: swamr continue --model auto",
+        "Or pick a specific model: swamr continue --model gpt-5.3-codex-high",
+        "If needed, increase spend/quota limits in Cursor account settings",
+      ],
+    };
+  }
   return {
     task_id: task.id,
     title: task.description,
@@ -276,7 +293,7 @@ function buildBrainContext(projectDir: string): string {
 function runCursorAgent(
   projectDir: string,
   prompt: string,
-  model: string = "sonnet-4",
+  model: string = "auto",
   trust: boolean = false
 ): Promise<{ success: boolean; output: string }> {
   return new Promise((resolve) => {
@@ -285,6 +302,7 @@ function runCursorAgent(
       "--print",
       "--output-format", "text",
       "--force",
+      "--sandbox", "disabled",
       "--approve-mcps",
       ...(trust ? ["--trust"] : []),
       "--workspace", projectDir,
@@ -311,24 +329,32 @@ function runCursorAgent(
       errorOutput += data.toString();
     });
 
+    let settled = false;
+    const finish = (result: { success: boolean; output: string }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve(result);
+    };
+
     child.on("close", (code) => {
-      resolve({
+      finish({
         success: code === 0,
         output: output || errorOutput,
       });
     });
 
     child.on("error", (err) => {
-      resolve({
+      finish({
         success: false,
         output: `Failed to spawn cursor agent: ${err.message}`,
       });
     });
 
     // 10 minute timeout per agent
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       child.kill("SIGTERM");
-      resolve({
+      finish({
         success: false,
         output: output + "\n[TIMEOUT: agent killed after 10 minutes]",
       });
@@ -391,6 +417,22 @@ async function runTaskBatch(
         dashboard.activeTasks = tasks
           .filter((t) => t.status === "in_progress")
           .map((t) => ({ id: t.id, description: t.description } as ProgressTask));
+      }
+
+      // If a blocker already exists for this task, do not rerun the worker.
+      // This avoids repeatedly hanging/retrying tasks that are waiting on a
+      // human/manual action until the blocker file is cleared.
+      const existingBlocker = readBlocker(projectDir, task.id);
+      if (existingBlocker) {
+        task.status = "blocked";
+        if (dashboard) {
+          dashboard.activeTasks = tasks
+            .filter((t) => t.status === "in_progress")
+            .map((t) => ({ id: t.id, description: t.description } as ProgressTask));
+          dashboard.blockedCount = state.tasks.filter((t) => t.status === "blocked").length;
+        }
+        saveState(projectDir, state);
+        return;
       }
 
       const fullPrompt = buildTaskPrompt(task, brainContext, projectDir);
@@ -566,6 +608,24 @@ RULES:
 6. Handle errors gracefully — no unhandled promise rejections
 7. Follow existing code patterns and naming conventions in the project
 
+SUPABASE (HOSTED ONLY — NO DOCKER):
+Never use Docker or supabase start. Local Supabase is not supported.
+
+HUMAN MANUAL STEPS (F2 — write blocker if missing):
+1. Create project: https://supabase.com/dashboard → New project (save database password)
+2. Settings → API: copy Project URL (https://<ref>.supabase.co)
+3. Same page: copy anon public key → EXPO_PUBLIC_SUPABASE_ANON_KEY / NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local
+4. Same page: copy service_role secret → SUPABASE_SERVICE_ROLE_KEY in .env.local (server only)
+5. Optional: supabase login for CLI
+
+AI HANDLES EVERYTHING ELSE via Supabase MCP:
+- list_projects, apply_migration, execute_sql, list_migrations, list_tables, get_advisors, generate_typescript_types
+- F3+ schema, RLS, indexes, PostGIS, seed data — all via MCP migrations (not Docker)
+- supabase link + db push when CLI is authenticated
+- npm run test:supabase to verify
+
+If keys are missing, write swamr/blockers/F2.json with exact dashboard URLs — do not use Docker.
+
 MANUAL-STEP / BLOCKER PROTOCOL (IMPORTANT):
 If you cannot finish because of something only a human can do — authenticating an MCP server,
 creating a Supabase/Google Cloud/other hosted project, providing an API key or secret, creating
@@ -715,8 +775,8 @@ export async function build(
 ) {
   const projectDir = path.resolve(targetDir);
   const config = loadConfig(projectDir);
-  const plannerModel = options.model ?? "sonnet-4";
-  const workerModel = "sonnet-4";
+  const plannerModel = options.model ?? "auto";
+  const workerModel = options.model ?? "auto";
   const trust = options.trust ?? false;
 
   // Check cursor agent is available
@@ -812,9 +872,9 @@ Do the following:
   {
     "id": "F2",
     "phase": "foundation",
-    "description": "Design and create database schema",
-    "agent": "database-optimizer",
-    "prompt": "Create the Supabase schema with these tables...",
+    "description": "Connect hosted Supabase project (no Docker)",
+    "agent": "backend-architect",
+    "prompt": "Hosted Supabase only — no Docker. HUMAN must create dashboard project and paste API keys into .env.local (Settings → API: URL, anon, service_role). Agent uses Supabase MCP for link, migrations, and npm run test:supabase. Write blocker if keys missing.",
     "depends_on": []
   },
   {
@@ -962,7 +1022,7 @@ export async function continueBuild(
 ) {
   const projectDir = path.resolve(targetDir);
   const config = loadConfig(projectDir);
-  const workerModel = options.model ?? "sonnet-4";
+  const workerModel = options.model ?? "auto";
   const trust = options.trust ?? false;
 
   const cursorCheck = runSafe("cursor agent --version");
