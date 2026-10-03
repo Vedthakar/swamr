@@ -288,3 +288,32 @@ export class ProgressDashboard {
     }
   }
 }
+
+/**
+ * --trust lets every agent run any shell command unsandboxed and auto-approves
+ * MCP servers (which can reach real accounts). Make the user say yes once.
+ */
+export async function confirmTrust(trust: boolean, yes: boolean): Promise<void> {
+  if (!trust || yes) return;
+  const warning = `
+${YELLOW}⚠  --trust runs every agent unsandboxed with all commands auto-approved.${RESET}
+   Agents can run any shell command on this machine and use your connected MCP
+   servers (Supabase, Vercel, GitHub, …), which act on your real accounts.
+   Only use it on a project you're happy for agents to modify, ideally in a
+   fresh git branch, VM, or container.
+`;
+  if (!process.stdin.isTTY) {
+    console.error(warning);
+    console.error("Refusing to run unattended with --trust. Re-run with --yes to confirm.");
+    process.exit(1);
+  }
+  console.log(warning);
+  const { createInterface } = await import("node:readline/promises");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = (await rl.question("   Continue with --trust? [y/N] ")).trim().toLowerCase();
+  rl.close();
+  if (answer !== "y" && answer !== "yes") {
+    console.log("Aborted. Run without --trust to keep agents sandboxed.");
+    process.exit(1);
+  }
+}

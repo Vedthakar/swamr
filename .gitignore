@@ -1,19 +1,35 @@
 # Dependencies
 node_modules/
 
-# Agency agents clone (downloaded during setup)
+# Build output (compiled by `npm install` via the prepare script)
+dist/
+*.tsbuildinfo
+
+# Agency agents clone (downloaded by `swamr init`)
 .agency-agents/
-
-# Claude Code local settings
-.claude/
-
-# OS files
-.DS_Store
-Thumbs.db
 
 # Secrets — never commit
 .env
-.env.local
-.env.*.local
-*.env.local
-**/.env.local
+.env.*
+!.env.example
+
+# Brag / video render output
+brag-output*/
+frames/
+
+# Logs and binaries
+*.log
+npm-debug.log*
+*.exe
+*.dll
+*.dylib
+*.so
+*.zip
+*.tgz
+
+# Editor / OS / local tool settings
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

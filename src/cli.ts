@@ -2,8 +2,9 @@
 
 import { init } from "./init.js";
 import { build, continueBuild, adoptBuild } from "./build.js";
+import { confirmTrust } from "./utils.js";
 
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 
 function printUsage() {
   console.log(`
@@ -30,8 +31,10 @@ Commands:
       --model <model>    Model for planning/worker agents (default: auto)
       --plan-only        Generate the plan but don't execute
       --resume           Resume from existing swamr/state.json
-      --trust            Auto-approve all agent commands (skip approval prompts)
-                         Without this flag, agents will ask before running commands.
+      --trust            Run agents unsandboxed with all commands and MCP servers
+                         auto-approved (asks you to confirm once). Without it,
+                         agents stay sandboxed and un-allowlisted commands are denied.
+      --yes, -y          Skip the --trust confirmation (for scripts/CI)
 
   continue [options]
                     Resume from swamr/state.json without re-planning.
@@ -40,7 +43,8 @@ Commands:
     Options:
       --dir <path>       Project directory (default: current dir)
       --model <model>    Model for worker agents (default: auto)
-      --trust            Auto-approve all agent commands (skip approval prompts)
+      --trust            Unsandboxed, auto-approved agents (see build --trust)
+      --yes, -y          Skip the --trust confirmation
       -m, --message <text>
                          Tell the swarm what you changed (saved to Obsidian brain).
                          Blockers with verify steps are auto-checked on continue.
@@ -54,7 +58,8 @@ Commands:
     Options:
       --dir <path>       Project directory (default: current dir)
       --model <model>    Model for planning/worker agents (default: auto)
-      --trust            Auto-approve all agent commands (skip approval prompts)
+      --trust            Unsandboxed, auto-approved agents (see build --trust)
+      --yes, -y          Skip the --trust confirmation
       -m, --message <text>
                          What you want built for the rest of the project.
 
@@ -64,7 +69,7 @@ Examples:
   swamr build --trust "A SaaS dashboard with auth, billing, and team management"
   swamr build --dir ./my-app --plan-only "Recipe sharing app with social features"
   swamr continue --dir ./my-app
-  swamr continue -m "OAuth providers enabled; bundle id is com.dealhounder.app"
+  swamr continue -m "OAuth providers enabled; bundle id is com.example.myapp"
   swamr adopt --dir ./my-app -m "Add the redemption history screen and finish checkout"
 `);
 }
@@ -98,6 +103,7 @@ async function main() {
       let planOnly = false;
       let resume = false;
       let trust = false;
+      let yes = false;
       let description = "";
 
       for (let i = 0; i < buildArgs.length; i++) {
@@ -117,6 +123,10 @@ async function main() {
           case "--trust":
             trust = true;
             break;
+          case "--yes":
+          case "-y":
+            yes = true;
+            break;
           default:
             if (!buildArgs[i].startsWith("--")) {
               description = buildArgs[i];
@@ -129,6 +139,7 @@ async function main() {
         process.exit(1);
       }
 
+      await confirmTrust(trust, yes);
       await build(dir, description || "Resume previous build", {
         model,
         plan_only: planOnly,
@@ -142,6 +153,7 @@ async function main() {
       let dir = ".";
       let model: string | undefined;
       let trust = false;
+      let yes = false;
       let message: string | undefined;
 
       for (let i = 0; i < continueArgs.length; i++) {
@@ -155,6 +167,10 @@ async function main() {
           case "--trust":
             trust = true;
             break;
+          case "--yes":
+          case "-y":
+            yes = true;
+            break;
           case "-m":
           case "--message":
             message = continueArgs[++i];
@@ -162,6 +178,7 @@ async function main() {
         }
       }
 
+      await confirmTrust(trust, yes);
       await continueBuild(dir, { model, trust, message });
       break;
     }
@@ -171,6 +188,7 @@ async function main() {
       let dir = ".";
       let model: string | undefined;
       let trust = false;
+      let yes = false;
       let message: string | undefined;
 
       for (let i = 0; i < adoptArgs.length; i++) {
@@ -184,6 +202,10 @@ async function main() {
           case "--trust":
             trust = true;
             break;
+          case "--yes":
+          case "-y":
+            yes = true;
+            break;
           case "-m":
           case "--message":
             message = adoptArgs[++i];
@@ -191,6 +213,7 @@ async function main() {
         }
       }
 
+      await confirmTrust(trust, yes);
       await adoptBuild(dir, { model, trust, message });
       break;
     }

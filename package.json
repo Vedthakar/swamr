@@ -1,7 +1,7 @@
 {
   "name": "swamr",
-  "version": "1.0.0",
-  "description": "Agent swarm for Cursor — 150+ specialist AI agents with Obsidian brain for context persistence",
+  "version": "1.5.0",
+  "description": "One prompt, a swarm of 150+ specialist Cursor agents that plan, build, test, harden and ship your project, sharing an Obsidian brain.",
   "type": "module",
   "bin": {
     "swamr": "./dist/cli.js"
@@ -14,15 +14,20 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "prepare": "tsc",
     "start": "node dist/cli.js"
   },
   "keywords": [
     "cursor",
+    "cursor-agent",
     "ai-agents",
-    "swarm",
+    "agent-swarm",
+    "multi-agent",
     "orchestrator",
     "obsidian",
-    "code-generation"
+    "code-generation",
+    "autonomous-agents",
+    "developer-tools"
   ],
   "author": "Ved Thakar",
   "license": "MIT",
@@ -37,5 +42,8 @@
     "typescript": "^5.7.0",
     "@types/node": "^22.0.0"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "homepage": "https://github.com/Vedthakar/swamr#readme",
+  "bugs": {
+    "url": "https://github.com/Vedthakar/swamr/issues"
+  }
 }

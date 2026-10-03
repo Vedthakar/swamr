@@ -669,10 +669,11 @@ function runCursorAgent(
       "agent",
       "--print",
       "--output-format", "text",
-      "--force",
-      "--sandbox", "disabled",
-      "--approve-mcps",
-      ...(trust ? ["--trust"] : []),
+      // Unattended mode is opt-in: without --trust, agents stay sandboxed and
+      // un-allowlisted shell commands and MCP servers are denied, not auto-run.
+      ...(trust
+        ? ["--force", "--sandbox", "disabled", "--approve-mcps", "--trust"]
+        : ["--sandbox", "enabled"]),
       "--workspace", projectDir,
       "--model", model,
       prompt,
@@ -887,7 +888,7 @@ Do ALL of the following, then STOP (do NOT write application code or per-feature
    - phase "testing": full end-to-end test suites (id prefix T)
    - phase "security": security hardening / audit (id prefix S), agent security-architect
    - phase "legal": legal & compliance — privacy policy, ToS, data handling (id prefix LG), agent legal-compliance-checker
-   - phase "launch": documentation + a handoff doc written to swamr/brain/06-launch/handoff.md + deploy (id prefix L)
+   - phase "launch": documentation + a handoff doc written to swamr/brain/06-launch/handoff.md + a deploy task (preview deploy unless the user explicitly asked for production) (id prefix L)
    Lifecycle tasks typically depend on the build phase being complete.
 
 Be decisive.`;
@@ -1646,7 +1647,7 @@ export async function build(
   console.log(`  Workers:    up to ${config.max_concurrent_agents} concurrent agents (~${config.min_build_tasks}+ total across waves)`);
   console.log(`  Planner:    ${plannerModel}`);
   console.log(`  Workers:    ${workerModel}`);
-  console.log(`  Trust mode: ${trust ? "ON (auto-approve all commands)" : "OFF (agents will ask before running commands)"}`);
+  console.log(`  Trust mode: ${trust ? "ON (unsandboxed, all commands + MCP servers auto-approved)" : "OFF (sandboxed; un-allowlisted commands are denied)"}`);
   console.log();
 
   // Check for existing state (resume)
@@ -1896,7 +1897,7 @@ export async function continueBuild(
   console.log(`  Project:    ${projectDir}`);
   console.log(`  Workers:    up to ${config.max_parallel_agents} parallel agents`);
   console.log(`  Workers:    ${workerModel}`);
-  console.log(`  Trust mode: ${trust ? "ON (auto-approve all commands)" : "OFF (agents will ask before running commands)"}`);
+  console.log(`  Trust mode: ${trust ? "ON (unsandboxed, all commands + MCP servers auto-approved)" : "OFF (sandboxed; un-allowlisted commands are denied)"}`);
   console.log();
 
   ensureStateDefaults(state);
@@ -1997,7 +1998,7 @@ export async function adoptBuild(
   console.log(`  Project:    ${projectDir}`);
   console.log(`  Workers:    up to ${config.max_concurrent_agents} concurrent agents (~${config.min_build_tasks}+ total across waves)`);
   console.log(`  Planner:    ${plannerModel}`);
-  console.log(`  Trust mode: ${trust ? "ON (auto-approve all commands)" : "OFF (agents will ask before running commands)"}`);
+  console.log(`  Trust mode: ${trust ? "ON (unsandboxed, all commands + MCP servers auto-approved)" : "OFF (sandboxed; un-allowlisted commands are denied)"}`);
   if (options.message?.trim()) console.log(`  Goal:       ${options.message.trim()}`);
   console.log();
 

@@ -110,9 +110,9 @@ Generated: [date]
 ### Phase 5: Launch
 | ID | Task | Agent | Size | Depends On | Criteria |
 |----|------|-------|------|------------|----------|
-| L1 | Production deploy | @devops-automator | M | H* | Live on production URL |
+| L1 | Deploy (preview by default; production only if the user asked) | @devops-automator | M | H* | Preview URL live, or blocker asking for prod approval |
 | L2 | Documentation | @engineering-technical-writer | M | H* | README, API docs complete |
-| L3 | Final validation | @testing-reality-checker | L | L1 | Production smoke test passes |
+| L3 | Final validation | @testing-reality-checker | L | L1 | Smoke test passes on the deployed URL |
 
 ## Dependency Graph
 [Visual representation using ASCII or mermaid syntax]

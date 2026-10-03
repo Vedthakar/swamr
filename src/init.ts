@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   info,
   warn,
@@ -19,7 +19,7 @@ const AGENCY_REPO = "https://github.com/msitarzewski/agency-agents.git";
 
 export function init(targetDir: string) {
   const projectDir = path.resolve(targetDir);
-  const swamrPkgDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const swamrPkgDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
   if (!fs.existsSync(projectDir)) {
     fs.mkdirSync(projectDir, { recursive: true });
