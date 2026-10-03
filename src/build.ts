@@ -731,6 +731,16 @@ function runCursorAgent(
   });
 }
 
+// The first agent of a run fails fast with this when the Cursor CLI isn't
+// logged in; stop with a clear message instead of planning against nothing.
+function exitIfNotAuthenticated(result: { success: boolean; output: string }) {
+  if (!result.success && /authentication required|cursor agent login|not logged in/i.test(result.output)) {
+    console.error("\n❌ The Cursor CLI isn't logged in. Run: cursor agent login");
+    console.error("Then re-run the same swamr command.\n");
+    process.exit(1);
+  }
+}
+
 // ─── Hierarchical planning ──────────────────────────────────────────────────
 // One lead architect splits the system into domains; a sub-planner per domain
 // produces its slice of tasks; a deterministic merge + integrator agent
@@ -894,6 +904,7 @@ Do ALL of the following, then STOP (do NOT write application code or per-feature
 Be decisive.`;
 
   const lead = await runCursorAgent(projectDir, leadPrompt, model, trust);
+  exitIfNotAuthenticated(lead);
   leadSpinner.stop(lead.success ? "Architecture and domains ready" : "Lead architect finished (with warnings)");
 
   let domains = readPlanningDomains(projectDir);
@@ -2050,7 +2061,8 @@ Write swamr/brain/00-project/existing-state.md documenting (use [[wikilinks]] wh
 - How to run the test suite${options.message?.trim() ? `\n\nThe user wants to build out: ${options.message.trim()}. Pay special attention to what is needed for that.` : ""}
 
 Be concrete and specific — the planners rely entirely on this note.`;
-  await runCursorAgent(projectDir, discoveryPrompt, plannerModel, trust);
+  const discovery = await runCursorAgent(projectDir, discoveryPrompt, plannerModel, trust);
+  exitIfNotAuthenticated(discovery);
   discoverySpinner.stop("Existing state documented");
 
   // ── Plan only the remaining work ────────────────────────────────────────────
