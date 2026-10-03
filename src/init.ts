@@ -42,7 +42,7 @@ export function init(targetDir: string) {
     header("Cloning agency-agents...");
     const spinner = new Spinner();
     spinner.start("Cloning 150+ agent definitions");
-    run(`git clone --depth 1 ${AGENCY_REPO} ${agencyDir}`);
+    run(`git clone --depth 1 ${AGENCY_REPO} ${JSON.stringify(agencyDir)}`);
     spinner.stop("Cloned agency-agents");
   }
 
